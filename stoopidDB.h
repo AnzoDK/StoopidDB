@@ -2,11 +2,14 @@
  StoopidDB format Created and owned by AnzoDK (Anton F. Rosenørn-Dohn) 2021
  */
 #pragma once
-#include <fstream>
 #include <iostream>
-#include <vector>
-#include <streambuf>
+#include <filesystem>
+#include <fstream>
 #include <stdio.h>
+#include <string.h>
+#include <streambuf>
+#include <vector>
+#include <unistd.h>
 
 #if defined(USE_KEYMAN) //Check if we should use keyman.h or use the internal struct - Use the internal struct if in doubt
 #include "keyman.h"
