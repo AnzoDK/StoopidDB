@@ -1,6 +1,15 @@
 #include <iostream>
 #include "stoopidDB.h"
 
+void RowPrinter(DBRow* row, int arraySize)
+{
+    for(size_t i = 0; i < arraySize;i++)
+    {
+         for(size_t u = 0; u < row[i].keys.size();u++)
+         std::cout << "DB Returned key: " << row[i].keys.at(u).name << " : " << row[i].keys.at(u).value << std::endl;
+    }
+}
+
 int main()
 {
     DBManager* dbMan = new DBManager();
@@ -21,13 +30,27 @@ int main()
           std::cout << dbMan->Error() << std::endl;
         }
     }
+    columns = new DBColumn[3];
+    columns[0] = DBColumn("id",DataType::INT, 8, ColumnSettings::NOT_NULL | ColumnSettings::AUTO_INCREMENT | ColumnSettings::PRIMARY_KEY);
+    columns[1] = DBColumn("Title", DataType::VARCHAR, 256, ColumnSettings::NOT_NULL);
+    columns[2] = DBColumn("Category", DataType::VARCHAR, 8, ColumnSettings::NOT_NULL);
+    if(dbMan->CreateTable("Posts",3,columns))
+    {
+        delete[] columns;
+        DBRow row = DBRow();
+        row.InsertData("Title","A title is all you need");
+        row.InsertData("Category","TextPosts");
+        if(!dbMan->InsertRow("Posts",row))
+        {
+          std::cout << dbMan->Error() << std::endl;
+        }
+    }
     int resultSize = 0;
     DBRow* result = dbMan->GetAllRowsFromTable("Users",resultSize);
-    for(size_t i = 0; i < resultSize;i++)
-    {
-         for(size_t u = 0; u < result[i].keys.size();u++)
-         std::cout << "DB Returned key: " << result[i].keys.at(u).name << " : " << result[i].keys.at(u).value << std::endl;
-    }
+    RowPrinter(result,resultSize);
+    delete[] result;
+    result = dbMan->GetAllRowsFromTable("Posts",resultSize);
+    RowPrinter(result,resultSize);
     delete[] result;
     delete dbMan;
 }

@@ -1002,10 +1002,19 @@ public:
            std::cout << TERMINAL_RED << "Failed to get entry table offset" << TERMINAL_NOCOLOR << std::endl;
            return 0;
        }
-       uchar* tmpBuffer = new uchar[extraBuffSize];
-       for(int u = 0; u < extraBuffSize;u++)
+       uint64_t combinedSize = expectedExtraLength;
+       for(int i = 0; i < columnCount; i++)
        {
-         tmpBuffer[u] = m_currDB->DBBuffer[allowedWriteOffset+u];
+           combinedSize += (columns[i].name.length()+1 < 256 ? columns[i].name.length()+1 : 255); //Do not exceed 255
+           combinedSize += 4; //for columnSizeOffset
+           combinedSize += 2; //for DataTypeByte and settingsByte
+           combinedSize += 4; //for maxDataSize
+       }
+       std::cout << "Resizing DB from " << m_currDB->DBSize << " to " << combinedSize+m_currDB->DBSize << std::endl;
+       ResizeDB(combinedSize+m_currDB->DBSize);
+       for(size_t u = 0; u < m_currDB->DBSize-allowedWriteOffset-combinedSize;u++)
+       {
+          m_currDB->DBBuffer[allowedWriteOffset+combinedSize+u] = m_currDB->DBBuffer[allowedWriteOffset+u];
        }
        for(int i = 0; i < columnCount; i++)
        {
@@ -1026,8 +1035,7 @@ public:
            uint32_t columnSize = expectedExtraLength-columnStart;
            
            
-           std::cout << "Resizing DB from " << m_currDB->DBSize << " to " << expectedExtraLength+m_currDB->DBSize << std::endl;
-           ResizeDB(expectedExtraLength+m_currDB->DBSize);
+
            for(int u = 0; u < (columns[i].name.length()+1 < 256 ? columns[i].name.length()+1 : 255); u++)
            {
                
@@ -1077,11 +1085,6 @@ public:
            }
           
        }
-       for(uint i = 0; i < extraBuffSize;i++)
-       {
-           m_currDB->DBBuffer[allowedWriteOffset+tableLength+i] = tmpBuffer[i];
-       }
-       delete[] tmpBuffer;
        uint64_t newTableOffset = (allowedWriteOffset+tableLength);
        int size = 0;
        uint64_t newEntryOffset = 0;
