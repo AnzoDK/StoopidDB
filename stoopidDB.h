@@ -1686,7 +1686,7 @@ private:
         
     }
     
-    DBRow* m_GetAllRows(std::string tableName)
+    DBRow* m_GetAllRows(std::string tableName, bool ignoreNewest=false)
     {
         size_t rowCount = m_GetRowCount(tableName);
         DBRow* rows = new DBRow[rowCount];
@@ -1694,7 +1694,7 @@ private:
         size_t EOT = m_GetEOT(tableName);
         int resultSize = 0;
         size_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,g_stoopidDBRowSig,6,resultSize);
-        for(size_t i = 0; i < rowCount; i++)
+        for(size_t i = 0; i < (ignoreNewest==true ? rowCount-1 : rowCount); i++)
         {
             size_t rowOffset = 0;
             size_t rowLength = m_GetRowLength(results[i]);
@@ -1809,11 +1809,11 @@ private:
         size_t currAutoInc = 0xFFFFFFFFFFFFFFFF;
         if(rowCount-1 > 0)
         {
-            DBRow* rows = m_GetAllRows(tableName);
-            DBRow r = rows[rowCount-1];
-            if(primKey != "" && rows[rowCount-1].Find(primKey) != *nokey)
+            DBRow* rows = m_GetAllRows(tableName,1);
+            DBRow r = rows[rowCount-1-1];
+            if(primKey != "" && rows[rowCount-1-1].Find(primKey) != *nokey)
             {
-                currAutoInc = std::stoi(rows[rowCount-1].Find(primKey).value);
+                currAutoInc = std::stoi(rows[rowCount-1-1].Find(primKey).value);
             }
         }
         
