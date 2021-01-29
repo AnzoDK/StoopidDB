@@ -44,6 +44,13 @@ int main()
         {
           std::cout << dbMan->Error() << std::endl;
         }
+        row = DBRow();
+        row.InsertData("Title","The more titles the better");
+        row.InsertData("Category","TextPosts");
+        if(!dbMan->InsertRow("Posts",row))
+        {
+          std::cout << dbMan->Error() << std::endl;
+        }
     }
     int resultSize = 0;
     DBRow* result = dbMan->GetAllRowsFromTable("Users",resultSize);
