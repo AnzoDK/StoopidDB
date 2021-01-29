@@ -4,3 +4,4 @@ src/*
 StoopidDB/*
 *.pkg.tar.zst
 Relics/*
+*.sdb
