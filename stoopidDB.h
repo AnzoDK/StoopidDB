@@ -11,9 +11,7 @@
 #include <vector>
 #include <unistd.h>
 
-#if defined(USE_KEYMAN) //Check if we should use keyman.h or use the internal struct - Use the internal struct if in doubt
-#include "keyman.h"
-#else
+#ifndef USE_KEYMAN //Check if we should use keyman.h or use the internal struct - Use the internal struct if in doubt
 struct Key
 {
     std::string name;
@@ -326,6 +324,15 @@ public:
         size_t len = strBuffer.length;
         return len;
     }
+    std::string ToSigned()
+    {
+        std::string tmp = "";
+        for(size_t i = 0; i < strBuffer.length;i++)
+        {
+            tmp += *strBuffer.at(i);
+        }
+        return tmp;
+    }
     explicit UnsignedString(const std::string &str)
     {
         strBuffer = UnsignedBuffer(str.c_str(),str.length());
@@ -504,11 +511,12 @@ public:
     }
     static size_t* Search(uchar* buffer, size_t offset, size_t length, uchar* searchTerm, size_t searchTermLength, int &resultSize)
     {
+        UnsignedBuffer* buff1 = new UnsignedBuffer(searchTerm,searchTermLength);
         int c = 0;
         resultSize = 0;
         while(true)
         {
-            UnsignedBuffer* buff1 = new UnsignedBuffer(searchTerm,searchTermLength);
+            
             UnsignedBuffer* buff2 = new UnsignedBuffer(&(buffer[c+offset]),searchTermLength);
 
             
@@ -522,14 +530,13 @@ public:
             }
             c++;
             delete buff2;
-            delete buff1;
+            
         }
         size_t* indexes = new size_t[resultSize];
         c = 0;
         int cc = 0;
         while(true)
         {
-            UnsignedBuffer* buff1 = new UnsignedBuffer(searchTerm,searchTermLength);
             UnsignedBuffer* buff2 = new UnsignedBuffer(&(buffer[c+offset]),searchTermLength);
             if(c+searchTermLength+offset >= length )
             {
@@ -542,9 +549,9 @@ public:
                 cc++;
             }
             c++;
-            delete buff1;
             delete buff2;
         }
+        delete buff1;
         return indexes;
     }
     static size_t* Search(uchar* buffer, size_t offset, size_t length, UnsignedString searchTerm, int &resultSize)
@@ -593,6 +600,7 @@ public:
             c++;
             delete buff2;
         }
+        delete buff1;
         return indexes;
     }
     static size_t* SearchFromEnd(uchar* buffer, size_t offset, uchar* searchTerm, size_t searchTermLength, int &resultSize)
@@ -692,11 +700,11 @@ struct DBRow
   {
       name = _name;
   }
-  Key Find(std::string name)
+  Key Find(std::string _name)
   {
      for(size_t i = 0; i < keys.size();i++)
      {
-         if(keys.at(i).name == name)
+         if(keys.at(i).name == _name)
          {
            return keys.at(i);  
          }
@@ -780,25 +788,25 @@ struct DataBase
            m_AddError("Invalid Header");
            return;
        }
-       std::cout << "Fetching Database Info..." << std::endl;
-       std::stringstream dbInfoStream = std::stringstream();
-       dbInfoStream << "DBEntryHeader @ 0x" << std::setfill('\0');
-       for(int i = 0; i < 8;i++)
-       {
-           dbInfoStream << std::setw(sizeof(uchar)*2);
-           dbInfoStream << std::hex << (int)DBBuffer[DBSize-8+i];
+       //std::cout << "Fetching Database Info..." << std::endl;
+       //std::stringstream dbInfoStream = std::stringstream();
+       //dbInfoStream << "DBEntryHeader @ 0x" << std::setfill('\0');
+       //for(int i = 0; i < 8;i++)
+       //{
+           //dbInfoStream << std::setw(sizeof(uchar)*2);
+           //dbInfoStream << std::hex << (int)DBBuffer[DBSize-8+i];
            
-       }
-       std::string dbInfoString = std::string(dbInfoStream.str());
-       std::cout << dbInfoString << std::dec << "\0" << std::endl;
-       std::cout << std::endl;
+       //}
+       //std::string dbInfoString = std::string(dbInfoStream.str());
+       //std::cout << dbInfoString << std::dec << "\0" << std::endl;
+       //std::cout << std::endl;
        
        }
        else
        {
          valid = false;
-         m_AddError("Could not open file");
          m_errorVector = std::vector<std::string>();
+         m_AddError("Could not open file");
          return;
        }
        
@@ -909,7 +917,7 @@ public:
         }
         else
         {
-          std::cout << "No DBPath - Ignoreing Load request" << std::endl; 
+          std::cout << "No DBPath - Ignoreing Load request" << std::endl; //Should maybe be replaced with a m_AddError();
           return false;
         }
         return true;
@@ -1003,10 +1011,19 @@ public:
            std::cout << TERMINAL_RED << "Failed to get entry table offset" << TERMINAL_NOCOLOR << std::endl;
            return 0;
        }
-       uchar* tmpBuffer = new uchar[extraBuffSize];
-       for(int u = 0; u < extraBuffSize;u++)
+       uint64_t combinedSize = expectedExtraLength;
+       for(int i = 0; i < columnCount; i++)
        {
-         tmpBuffer[u] = m_currDB->DBBuffer[allowedWriteOffset+u];
+           combinedSize += (columns[i].name.length()+1 < 256 ? columns[i].name.length()+1 : 255); //Do not exceed 255
+           combinedSize += 4; //for columnSizeOffset
+           combinedSize += 2; //for DataTypeByte and settingsByte
+           combinedSize += 4; //for maxDataSize
+       }
+       std::cout << "Resizing DB from " << m_currDB->DBSize << " to " << combinedSize+m_currDB->DBSize << std::endl;
+       ResizeDB(combinedSize+m_currDB->DBSize);
+       for(size_t u = 0; u < m_currDB->DBSize-allowedWriteOffset-combinedSize;u++)
+       {
+          m_currDB->DBBuffer[allowedWriteOffset+combinedSize+u] = m_currDB->DBBuffer[allowedWriteOffset+u];
        }
        for(int i = 0; i < columnCount; i++)
        {
@@ -1027,8 +1044,7 @@ public:
            uint32_t columnSize = expectedExtraLength-columnStart;
            
            
-           std::cout << "Resizing DB from " << m_currDB->DBSize << " to " << expectedExtraLength+m_currDB->DBSize << std::endl;
-           ResizeDB(expectedExtraLength+m_currDB->DBSize);
+
            for(int u = 0; u < (columns[i].name.length()+1 < 256 ? columns[i].name.length()+1 : 255); u++)
            {
                
@@ -1078,11 +1094,6 @@ public:
            }
           
        }
-       for(uint i = 0; i < extraBuffSize;i++)
-       {
-           m_currDB->DBBuffer[allowedWriteOffset+tableLength+i] = tmpBuffer[i];
-       }
-       delete[] tmpBuffer;
        uint64_t newTableOffset = (allowedWriteOffset+tableLength);
        int size = 0;
        uint64_t newEntryOffset = 0;
@@ -1238,7 +1249,6 @@ public:
            uint64_t writeOffset = m_GetNewRowWriteOffset(tableName);
            m_DirectWrite(writeOffset, 6, rowSig);
            m_DirectWrite(writeOffset+6,8,(uchar*)&expandSize);
-           
            uint64_t newWriteOffset = writeOffset+6+8;
            if(!m_WriteAutoAndUpdateOffset(tableName,newWriteOffset))
            {
@@ -1252,15 +1262,64 @@ public:
                {
                     m_DirectWrite(newWriteOffset,4,(uchar*)&id);
                     newWriteOffset+=4;
-                    if(row.keys.at(i).value.length() < maxData)
+                    size_t value = 0;
+                    DataType type = DataType(m_GetColumnType(tableName,row.keys.at(i).name));
+                    switch(type)
                     {
-                        m_DirectWriteNullFill(newWriteOffset,row.keys.at(i).value.length(),maxData,UnsignedBuffer::UcharFromString(row.keys.at(i).value));
+                        case DataType::INT:
+                        {
+                          if(m_GetColumnDataMaxSize(tableName,row.keys.at(i).name) <= 4 )  
+                          {
+                            value = static_cast<uint32_t>(std::stoi(row.keys.at(i).value));
+                          }
+                          else if(m_GetColumnDataMaxSize(tableName,row.keys.at(i).name) <= 8 && m_GetColumnDataMaxSize(tableName,row.keys.at(i).name) > 4)
+                          {
+                              
+                              for(size_t u = 0; u < row.keys.at(i).value.length();u++)
+                              {
+                                  char c = row.keys.at(i).value.at(row.keys.at(i).value.length()-1-u);
+                                  std::string tmp = "";
+                                  tmp += c;
+                                  if(u == 0)
+                                  {
+                                    value += static_cast<uint64_t>(std::stoi(tmp));
+                                  }
+                                  else
+                                  {
+                                    value += static_cast<uint64_t>(std::stoi(tmp)*(10*u));  
+                                  }
+                              }
+                          }
+                           if(row.keys.at(i).value.length() < maxData)
+                            {
+                                m_DirectWriteNullFill(newWriteOffset,row.keys.at(i).value.length(),maxData,(uchar*)&value);
+                            }
+                            else
+                            {
+                                m_DirectWrite(newWriteOffset,maxData,(uchar*)&value);
+                                m_AddError("Data is too large for column - Writing untill maxSize is hit");
+                            }
+                          break;  
+                        }
+                        case DataType::VARCHAR:
+                        {
+                            if(row.keys.at(i).value.length() < maxData)
+                            {
+                                m_DirectWriteNullFill(newWriteOffset,row.keys.at(i).value.length(),maxData,UnsignedBuffer::UcharFromString(row.keys.at(i).value));
+                            }
+                            else
+                            {
+                                m_DirectWrite(newWriteOffset,maxData,UnsignedBuffer::UcharFromString(row.keys.at(i).value));
+                                m_AddError("Data is too large for column - Writing untill maxSize is hit");
+                            }
+                          break;  
+                        }
+                        case DataType::TIME_DATE: //TODO
+                        {
+                            break;
+                        }
                     }
-                    else
-                    {
-                        m_DirectWrite(newWriteOffset,maxData,UnsignedBuffer::UcharFromString(row.keys.at(i).value));
-                        m_AddError("Data is too large for column - Writing untill maxSize is hit");
-                    }
+
                     newWriteOffset+=maxData;
                     
                }
@@ -1389,7 +1448,7 @@ private:
              std::cout << TERMINAL_RED << "Can't create table - No DB is loaded" << TERMINAL_NOCOLOR << std::endl;
              return 1;
          }
-         std::ofstream out = std::ofstream("./backUp.db",std::ios::binary);
+         std::ofstream out = std::ofstream("./backUp_dataBase",std::ios::binary);
          std::string tmpOut = "";
          if(m_currDB->DBSize > 2048)
          {
@@ -1605,7 +1664,7 @@ private:
         std::string* names = m_GetAllColumnNames(tableName);
         for(size_t i = 0; i < columnCount; i++)
         {
-            UnsignedString tmp = m_ReadUnsignedString(offset,255);
+            UnsignedString tmp = m_ReadUnsignedString(offset,255,1);
             size_t columnSize = m_ReadUnsingedValue(4, offset+tmp.length());
             size_t nextOffset = offset+columnSize;
             uchar settingsByte = m_ReadUnsingedValue(1,offset+tmp.length()+4+1);
@@ -1644,23 +1703,45 @@ private:
                 std::string columnName = m_GetColumnNameFromID(tableName,m_ReadUnsingedValue(4,results[i]+6+8+rowOffset));
                 size_t columnMAX = m_GetColumnDataMaxSize(tableName,columnName);
                 DataType type = DataType(m_GetColumnType(tableName,columnName));
-                std::string dataString = m_ReadString(results[i]+6+8+4+rowOffset,columnMAX);
+                std::string dataString = "";
                 switch(type)
                 {
-                    case DataType::INT:
-                        dataString = std::to_string(static_cast<int64_t>(std::atoi(dataString.c_str())));
+                    case DataType::INT:{
+                        UnsignedString uData = m_ReadUnsignedString(results[i]+6+8+4+rowOffset,columnMAX,0);
+                        size_t tmp = 0;
+                        if(columnMAX <= 8)
+                        {
+                        for(size_t u = 0; u < columnMAX; u++)
+                        {
+                            
+                            tmp = (tmp | uData.at(columnMAX-1-u)) << (u == columnMAX-1 ? 0 : 8);
+                        }
+                        dataString = std::to_string(static_cast<int64_t>(tmp));
+                        break;
+                        }
+                        else
+                        {
+                            //The number is larger than 64 bits - a solution is needed for this
+                          break;  
+                        }
+                    }
+                    
+                    case DataType::VARCHAR:{
+                        UnsignedString uData = m_ReadUnsignedString(results[i]+6+8+4+rowOffset,columnMAX,1);
+                        dataString = uData.ToSigned();
                     break;
-                    case DataType::VARCHAR:
-                        //Thats fine XD
-                    break;
-                    case DataType::TIME_DATE:
+                    }
+                    case DataType::TIME_DATE:{
                         //TODO
                     break;
+                    }
                     default:
+                    {
                         std::string tmpS = "[Non-Fatal] Could Not Get DataType of Column: ";
                         tmpS+="<" + tableName + "," + columnName + ">";
                         m_AddError(tmpS);
                     break;
+                    }
                 }
                 rows[i].InsertData(m_GetColumnNameFromID(tableName,m_ReadUnsingedValue(4,results[i]+6+8+rowOffset)),dataString);
                 rowOffset += columnMAX+4;
@@ -1725,13 +1806,14 @@ private:
           return false;  
         }
         
-        size_t currAutoInc = 0;
+        size_t currAutoInc = 0xFFFFFFFFFFFFFFFF;
         if(rowCount-1 > 0)
         {
             DBRow* rows = m_GetAllRows(tableName);
-            if(primKey != "" && rows[rowCount].Find(primKey) != *nokey)
+            DBRow r = rows[rowCount-1];
+            if(primKey != "" && rows[rowCount-1].Find(primKey) != *nokey)
             {
-                currAutoInc = std::stoi(rows[rowCount].Find(primKey).value);
+                currAutoInc = std::stoi(rows[rowCount-1].Find(primKey).value);
             }
         }
         
@@ -1745,8 +1827,8 @@ private:
         uint32_t id = m_GetColumnID(tableName,primKey);
         if(id != 0xFFFFFFFF)
         {
-        m_DirectWrite(offset,4,(uchar*)(&id));
-        m_DirectWriteNullFill(offset+4,8,m_GetColumnDataMaxSize(tableName,primKey),(uchar*)(&currAutoInc));
+        m_DirectWrite(offset,4,(uchar*)&id);
+        m_DirectWriteNullFill(offset+4,8,m_GetColumnDataMaxSize(tableName,primKey),(uchar*)&currAutoInc);
         offset+=4+m_GetColumnDataMaxSize(tableName,primKey);
         return true;
         }
@@ -2087,13 +2169,14 @@ private:
     }
     /*
      * @param Includes the null at the end of the string (so length() will return length WITH null)
+     * If respectNullTerminator is set to false the buffer will NOT add a \0 byte at the end
      */
-    UnsignedString m_ReadUnsignedString(uint64_t _offset, uint maxRead)
+    UnsignedString m_ReadUnsignedString(uint64_t _offset, uint maxRead, bool respectNullTerminator=true)
     {
        std::string tmp = "";
         for(uint i = 0; i < maxRead;i++)
         {
-            if(m_currDB->DBBuffer[_offset+i] == '\0')
+            if((m_currDB->DBBuffer[_offset+i] == static_cast<uchar>('\0')) && (respectNullTerminator == true))
             {
                 break;
             }
@@ -2102,7 +2185,11 @@ private:
                 tmp += static_cast<char>(m_currDB->DBBuffer[_offset+i]);
             }
         }
-        UnsignedString nullStr = UnsignedString(static_cast<uchar>('\0'));
+        UnsignedString nullStr = UnsignedString("");
+        if(respectNullTerminator)
+        {
+            nullStr = UnsignedString(static_cast<uchar>('\0'));
+        }
         UnsignedString utmp = UnsignedString(tmp);
         utmp += nullStr;
         return utmp; 
