@@ -3,3 +3,4 @@ pkg/*
 src/*
 StoopidDB/*
 *.pkg.tar.zst
+Relics/*

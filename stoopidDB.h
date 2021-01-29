@@ -11,9 +11,7 @@
 #include <vector>
 #include <unistd.h>
 
-#if defined(USE_KEYMAN) //Check if we should use keyman.h or use the internal struct - Use the internal struct if in doubt
-#include "keyman.h"
-#else
+#ifndef USE_KEYMAN //Check if we should use keyman.h or use the internal struct - Use the internal struct if in doubt
 struct Key
 {
     std::string name;
@@ -504,11 +502,12 @@ public:
     }
     static size_t* Search(uchar* buffer, size_t offset, size_t length, uchar* searchTerm, size_t searchTermLength, int &resultSize)
     {
+        UnsignedBuffer* buff1 = new UnsignedBuffer(searchTerm,searchTermLength);
         int c = 0;
         resultSize = 0;
         while(true)
         {
-            UnsignedBuffer* buff1 = new UnsignedBuffer(searchTerm,searchTermLength);
+            
             UnsignedBuffer* buff2 = new UnsignedBuffer(&(buffer[c+offset]),searchTermLength);
 
             
@@ -522,14 +521,13 @@ public:
             }
             c++;
             delete buff2;
-            delete buff1;
+            
         }
         size_t* indexes = new size_t[resultSize];
         c = 0;
         int cc = 0;
         while(true)
         {
-            UnsignedBuffer* buff1 = new UnsignedBuffer(searchTerm,searchTermLength);
             UnsignedBuffer* buff2 = new UnsignedBuffer(&(buffer[c+offset]),searchTermLength);
             if(c+searchTermLength+offset >= length )
             {
@@ -542,9 +540,9 @@ public:
                 cc++;
             }
             c++;
-            delete buff1;
             delete buff2;
         }
+        delete buff1;
         return indexes;
     }
     static size_t* Search(uchar* buffer, size_t offset, size_t length, UnsignedString searchTerm, int &resultSize)
@@ -593,6 +591,7 @@ public:
             c++;
             delete buff2;
         }
+        delete buff1;
         return indexes;
     }
     static size_t* SearchFromEnd(uchar* buffer, size_t offset, uchar* searchTerm, size_t searchTermLength, int &resultSize)
@@ -780,25 +779,25 @@ struct DataBase
            m_AddError("Invalid Header");
            return;
        }
-       std::cout << "Fetching Database Info..." << std::endl;
-       std::stringstream dbInfoStream = std::stringstream();
-       dbInfoStream << "DBEntryHeader @ 0x" << std::setfill('\0');
-       for(int i = 0; i < 8;i++)
-       {
-           dbInfoStream << std::setw(sizeof(uchar)*2);
-           dbInfoStream << std::hex << (int)DBBuffer[DBSize-8+i];
+       //std::cout << "Fetching Database Info..." << std::endl;
+       //std::stringstream dbInfoStream = std::stringstream();
+       //dbInfoStream << "DBEntryHeader @ 0x" << std::setfill('\0');
+       //for(int i = 0; i < 8;i++)
+       //{
+           //dbInfoStream << std::setw(sizeof(uchar)*2);
+           //dbInfoStream << std::hex << (int)DBBuffer[DBSize-8+i];
            
-       }
-       std::string dbInfoString = std::string(dbInfoStream.str());
-       std::cout << dbInfoString << std::dec << "\0" << std::endl;
-       std::cout << std::endl;
+       //}
+       //std::string dbInfoString = std::string(dbInfoStream.str());
+       //std::cout << dbInfoString << std::dec << "\0" << std::endl;
+       //std::cout << std::endl;
        
        }
        else
        {
          valid = false;
-         m_AddError("Could not open file");
          m_errorVector = std::vector<std::string>();
+         m_AddError("Could not open file");
          return;
        }
        
@@ -909,7 +908,7 @@ public:
         }
         else
         {
-          std::cout << "No DBPath - Ignoreing Load request" << std::endl; 
+          std::cout << "No DBPath - Ignoreing Load request" << std::endl; //Should maybe be replaced with a m_AddError();
           return false;
         }
         return true;
