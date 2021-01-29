@@ -17,7 +17,7 @@ int main()
     dbMan->LoadDB("./local_db.sdb");
     DBColumn* columns = new DBColumn[3];
     columns[0] = DBColumn("id",DataType::INT, 8, ColumnSettings::NOT_NULL | ColumnSettings::AUTO_INCREMENT | ColumnSettings::PRIMARY_KEY);
-    columns[1] = DBColumn("Name", DataType::VARCHAR, 256, ColumnSettings::NOT_NULL);
+    columns[1] = DBColumn("Name", DataType::VARCHAR, 50, ColumnSettings::NOT_NULL);
     columns[2] = DBColumn("Age", DataType::INT, 8, ColumnSettings::NOT_NULL);
     if(dbMan->CreateTable("Users",3,columns))
     {
@@ -32,7 +32,7 @@ int main()
     }
     columns = new DBColumn[3];
     columns[0] = DBColumn("id",DataType::INT, 8, ColumnSettings::NOT_NULL | ColumnSettings::AUTO_INCREMENT | ColumnSettings::PRIMARY_KEY);
-    columns[1] = DBColumn("Title", DataType::VARCHAR, 256, ColumnSettings::NOT_NULL);
+    columns[1] = DBColumn("Title", DataType::VARCHAR, 100, ColumnSettings::NOT_NULL);
     columns[2] = DBColumn("Category", DataType::VARCHAR, 8, ColumnSettings::NOT_NULL);
     if(dbMan->CreateTable("Posts",3,columns))
     {
