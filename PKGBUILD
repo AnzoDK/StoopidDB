@@ -1,7 +1,7 @@
 # Maintainer: AnzoDK <anton@rosenoern-productions.dk>
 pkgname="stoopiddb-header"
 provides=('stoopiddb')
-pkgver=0.2.1
+pkgver=0.2.1.1
 pkgrel=1
 pkgdesc="Simple and dirty database header for cpp projects"
 arch=('any')

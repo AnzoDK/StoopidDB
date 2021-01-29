@@ -60,10 +60,12 @@ int main()
         }
     }
     int resultSize = 0;
+    std::cout << "Printing table: Users" << std::endl; 
     DBRow* result = dbMan->GetAllRowsFromTable("Users",resultSize);
     RowPrinter(result,resultSize);
     delete[] result;
     result = dbMan->GetAllRowsFromTable("Posts",resultSize);
+    std::cout << "Printing table: Titles" << std::endl; 
     RowPrinter(result,resultSize);
     delete[] result;
     delete dbMan;
