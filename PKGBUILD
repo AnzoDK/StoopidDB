@@ -15,7 +15,6 @@ package()
    cd StoopidDB
    mkdir -p "$pkgdir/usr/include"
    install -D ./stoopidDB.h "$pkgdir/usr/include/stoopidDB.h"
-   install -D ./testProgram.cpp "{$pkgdir}"/usr/include/stoopidDB.cpp
    install -D ./LICENSE "${pkgdir}"/usr/share/licenses/$pkgname/LICENSE
    
    
