@@ -14,6 +14,7 @@ fi
 if [ "$PKGMAN" == "pacman" ]
 then
 rm -rf ./stoopiddb-header-*
+cp ./PKGBUILDS/Dev/PKGBUILD ./PKGBUILD
 makepkg -f
 sudo pacman -U ./stoopiddb-header-*
 exit 0
