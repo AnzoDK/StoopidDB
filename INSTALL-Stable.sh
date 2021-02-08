@@ -17,6 +17,7 @@ rm -rf ./stoopiddb-header-*
 cp ./PKGBUILDS/Stable/PKGBUILD ./PKGBUILD
 makepkg -f
 sudo pacman -U ./stoopiddb-header-*
+rm ./PKGBUILD
 exit 0
 else
 #TODO make install process for .deb
