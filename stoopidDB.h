@@ -2410,6 +2410,15 @@ private:
             m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[m_currDB->DBSize-1-push_length-i];
         }
     }
+    void m_PullData(uint64_t offset, uint64_t pull_length)
+    {
+        for(size_t i = 0; i < m_currDB->DBSize-offset-pull_length; i++)
+        {       
+            //m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[m_currDB->DBSize-1-pull_length-i];
+            m_currDB->DBBuffer[offset+i] = m_currDB->DBBuffer[offset+pull_length+i];
+            
+        }
+    }
     
     uint64_t m_GetEOT(std::string tableName)
     {
