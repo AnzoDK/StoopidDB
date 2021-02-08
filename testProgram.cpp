@@ -68,5 +68,11 @@ int main()
     std::cout << "Printing table: Titles" << std::endl; 
     RowPrinter(result,resultSize);
     delete[] result;
+    
+    if(dbMan->SQlQuery("CREATE TABLE Hats(ID int(8) NOT NULL, Size int(8) NOT NULL, PRIMARY KEY (ID));",1).code != SQLResponseCode::SQL_OK)
+    {
+        std::cout << "Error - as expected" << std::endl;
+    }
+    
     delete dbMan;
 }

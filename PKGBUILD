@@ -15,8 +15,6 @@ package()
    cd StoopidDB
    mkdir -p "$pkgdir/usr/include"
    install -D ./stoopidDB.h "$pkgdir/usr/include/stoopidDB.h"
-   install -D ./LICENSE "${pkgdir}"/usr/share/licenses/$pkgname/LICENSE
-   
-   
+   install -D ./LICENSE "${pkgdir}"/usr/share/licenses/$pkgname/LICENSE   
 }
 

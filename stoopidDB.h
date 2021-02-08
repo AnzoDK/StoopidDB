@@ -10,6 +10,7 @@
 #include <streambuf>
 #include <vector>
 #include <unistd.h>
+#include <algorithm>
 
 #ifndef USE_KEYMAN //Check if we should use keyman.h or use the internal struct - Use the internal struct if in doubt
 struct Key
@@ -86,6 +87,59 @@ uchar g_stoopidDBRowSig[6] = {
  ChangeLog: Added copyconstructor for UnsignedBuffer - that for some reason accepted using a const UnsignedBuffer& as an argument, due to it having a overloaded operator= that gave it the power to create new UnsignedBuffers from others, without uisng the a copyconstructor. That problem seems to have been solved!!!
  
  */
+
+std::vector<std::string> CppSplit(std::string str, char seperator) //I hate vectors for the simple reason that I like C-arrays - But I guess it makes sense here
+{
+   size_t last = 0;
+   std::vector<std::string> arr = std::vector<std::string>();
+   for(size_t i = 0; i < str.length();i++)
+   {
+     if(str.at(i) == seperator)
+     {
+         arr.push_back(str.substr(last,i-last));
+         last = i+1;
+     }
+     if(i == str.length()-1)
+     {
+         arr.push_back(str.substr(last,i-last+1));
+     }
+   }
+   return arr;
+}
+
+char** CSplit(const char* str, size_t strLen, char seperator, size_t &resultSize)
+{
+    size_t count = 0;
+    for(size_t i = 0; i < strLen;i++)
+    {
+        if(str[i] == seperator)
+        {
+         count++;
+        }
+    }
+    char** arr = new char*[count];
+    size_t old = 0;
+    for(size_t i = 0; i < strLen;i++)
+    {
+        if(str[i] == seperator)
+        {
+         arr[i] = new char[i-old];
+         for(size_t u = 0; u < i-old;u++)
+         {
+             arr[i][u] = str[u];
+         }
+         old = i;
+        }
+    }
+    resultSize = count;
+    return arr;
+}
+
+void StrToLower(std::string &str)
+{
+    std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+}
+
 
 enum ColumnSettings
 {
@@ -739,12 +793,48 @@ struct DBRow
   
 };
 
+#ifndef NO_SQL
+enum SQLResponseCode
+{
+  SQL_OK = 0b00000000,
+  SQL_SYNTAX_ERROR = 0b10000000,
+  SQL_NO_TABLE = 0b01000000,
+  SQL_NO_COLUMN = 0b11000000,
+  SQL_SCRIPT_ERROR = 0b00100000,
+  SQL_NOT_IMPLEMENTED = 0b00010000
+};
+
+enum SQLCommand
+{
+  SELECT,
+  UPDATE,
+  DELETE,
+  INSERT_INTO,
+  CREATE,
+  ALTER
+};
+
+enum SQLEntity
+{
+    TABLE,
+    INDEX,
+    DATABASE
+};
+
+struct SQLResponse
+{
+    SQLResponseCode code = SQL_OK;
+    DBRow* returnedRows = 0x0;
+    size_t returnedRowsSize = 0;
+};
+#endif
+
 struct DataBase
 {
 
    std::string path;
    std::string versionString;
-   unsigned int DBSize;
+   size_t DBSize;
    u_int8_t* DBBuffer = nullptr; 
    bool valid = true;
    std::string Err()
@@ -1021,10 +1111,13 @@ public:
        }
        std::cout << "Resizing DB from " << m_currDB->DBSize << " to " << combinedSize+m_currDB->DBSize << std::endl;
        ResizeDB(combinedSize+m_currDB->DBSize);
+       
+       //Relocate old data - Must be done backwards to avoid data overwriting itself when tables are smaller than the entry table XD
        for(size_t u = 0; u < m_currDB->DBSize-allowedWriteOffset-combinedSize;u++)
        {
-          m_currDB->DBBuffer[allowedWriteOffset+combinedSize+u] = m_currDB->DBBuffer[allowedWriteOffset+u];
+          m_currDB->DBBuffer[m_currDB->DBSize-1-u] = m_currDB->DBBuffer[allowedWriteOffset+(m_currDB->DBSize-allowedWriteOffset-combinedSize-1)-u];
        }
+       m_NullFill(allowedWriteOffset,combinedSize);
        for(int i = 0; i < columnCount; i++)
        {
            UnsignedString uNameString = UnsignedString(columns[i].name);
@@ -1100,6 +1193,7 @@ public:
        size_t* results = UnsignedString::Search(m_currDB->DBBuffer, allowedWriteOffset+tableLength, m_currDB->DBSize, entrySig, 6, size);
        
        std::cout << "Found " << size << " other tables" << std::endl;
+       m_WriteDBToDisk();
        uint64_t ENTWrite = 0;
        if(size > 0)
        {
@@ -1221,18 +1315,10 @@ public:
            expandSize+= row.keys.size()*4; //reserve space for columnID
            expandSize+=2; //this is needed - have yet to know why
            expandSize += m_CalculateSpaceForUnassignedColumns(tableName,row.keys);
-           uint64_t newEOT = EOT+expandSize;
-           uchar* tmp_buffer = new uchar[m_currDB->DBSize-EOT];
-           uint64_t tmp_buffer_size = m_currDB->DBSize-EOT;
-           for(uint64_t i = 0; i < m_currDB->DBSize-EOT;i++)
-           {
-               tmp_buffer[i] = m_currDB->DBBuffer[EOT+i];
-           }
-           
+           uint64_t newEOT = EOT+expandSize;  
            m_RewriteEOT(tableName,newEOT);
            ResizeDB(expandSize+m_currDB->DBSize,1);
-           m_DirectWrite(newEOT,tmp_buffer_size,tmp_buffer);
-           delete[] tmp_buffer;
+           m_PushData(EOT,expandSize);
            m_NullFill(EOT,expandSize);
            m_UpdateEntryTableOffset(expandSize);
            m_FixEntryTable(expandSize);
@@ -1406,7 +1492,7 @@ public:
                  return 0;
                }
                uint64_t length = m_GetRowLength(offset);
-               for(size_t i = 0; i < length;i++)
+               for(size_t i = 0; i < m_currDB->DBSize-offset;i++)
                {
                    m_currDB->DBBuffer[offset+i] = m_currDB->DBBuffer[offset+length+i];
                }
@@ -1417,7 +1503,314 @@ public:
        }
        return false;
    }
-   
+   #ifndef NO_SQL
+   SQLResponse SQlQuery(std::string sqlQ,bool verbose=false)
+   {
+       SQLResponse response = SQLResponse();
+       if(verbose)
+       {
+           std::cout << TERMINAL_CYAN << '"' << "PlsNoSQL v1 C++ edition" << '"' << " will be used for SQL Processing." << std::endl << "The keywords and syntax may be a bit different than usual SQL." << std::endl << "Please refer to the documentation for help." << TERMINAL_NOCOLOR << std::endl;
+       }
+       size_t pos = sqlQ.find("'", 0);
+       std::vector<size_t> indexes = std::vector<size_t>();
+       while(pos != std::string::npos)
+       {
+            indexes.push_back(pos);
+            pos = sqlQ.find("'",pos+1);
+       }
+       if(indexes.size() % 2 != 0)
+       {
+           std::string s = TERMINAL_YELLOW;
+           s += "[Fatal] {SQL Code Processing} Un-even amount of (') symbols - Note that ";
+           s += '"';
+           s += " is not supported";
+           s += TERMINAL_NOCOLOR;
+           m_AddError(s);
+           response.code = SQLResponseCode::SQL_SYNTAX_ERROR;
+       }
+       pos = sqlQ.find(";", 0);
+       indexes.clear();
+       while(pos != std::string::npos)
+       {
+            indexes.push_back(pos);
+            pos = sqlQ.find(";",pos+1);
+       }
+       if(indexes.size() == 0)
+       {
+           response.code = SQL_SYNTAX_ERROR;
+           m_AddError("[Fatal] {SQL Code Processing} Missing ';'");
+           return response;
+       }
+       if(verbose)
+       {
+         std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} " << indexes.size() << " Line(s) detected" << TERMINAL_NOCOLOR << std::endl;
+         std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Starting Keyword Detection..." << TERMINAL_NOCOLOR << std::endl;
+       }
+       //Keyword detection
+       std::vector<std::string> lines = std::vector<std::string>();
+       size_t prevIndex = 0;
+       for(size_t i = 0; i < indexes.size();i++)
+       {
+           lines.push_back(sqlQ.substr(prevIndex,indexes.at(i)+1));
+           prevIndex = indexes.at(i)+1;
+       }
+       indexes.clear();
+       std::vector<SQLCommand> CommandKeys = std::vector<SQLCommand>();
+       std::vector<SQLEntity> AffectedEntities = std::vector<SQLEntity>();
+       std::vector<std::string> Names = std::vector<std::string>();
+       for(size_t i = 0; i < lines.size();i++)
+       {
+           std::vector<std::string> words = CppSplit(lines.at(i),' ');
+           std::transform(words.at(0).begin(), words.at(0).end(), words.at(0).begin(), ::tolower);
+           if(words.at(0) == "select")
+           {
+               CommandKeys.push_back(SQLCommand::SELECT);
+           }
+           else if(words.at(0) == "update")
+           {
+               CommandKeys.push_back(SQLCommand::UPDATE);
+           }
+           else if(words.at(0) == "alter")
+           {
+               CommandKeys.push_back(SQLCommand::ALTER);
+           }
+           else if(words.at(0) == "create")
+           {
+               StrToLower(words.at(1));
+               CommandKeys.push_back(SQLCommand::CREATE);
+               if(words.at(1) == "table")
+               {
+                   AffectedEntities.push_back(SQLEntity::TABLE);
+                   std::string tableName = "";
+                   if(words.at(2).find("(") != std::string::npos)
+                   {
+                       //Is the "(" the last character?
+                       if(words.at(2).find("(") == words.at(2).length()-1)
+                       {
+                        words.insert(words.begin()+3,"(");
+                        words.at(2) = words.at(2).substr(0,words.at(2).find("("));
+                        
+                       }
+                       else
+                       {
+                           size_t pos = words.at(2).find("(");
+                           words.insert(words.begin()+3,"(");
+                           words.insert(words.begin()+4,words.at(2).substr(pos+1,(words.at(2).length()-1)-pos));
+                           words.at(2) = words.at(2).substr(0,words.at(2).find("("));
+                       }
+                       
+                   }
+                   tableName = words.at(2);
+                   if(verbose)
+                   {
+                     std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Guessing action to be: create a new table with name: " << tableName << std::endl << "[Info] {SQL Code Processing} Starting Column Detection..." << TERMINAL_NOCOLOR << std::endl;  
+                     
+                   }
+                   std::string columns = "";
+                   for(int u = 3; u < words.size();u++)
+                   {
+                       columns+=(words.at(u)+" ");
+                   }
+                   if(verbose)
+                   {
+                     std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Looking for column clues in: " << columns << TERMINAL_NOCOLOR << std::endl;
+                   }
+                   int c_pos = columns.find(",");
+                   int count = 0;
+                   if(c_pos != std::string::npos)
+                   {
+                        count++;
+                        c_pos++;
+                   }
+                   while(columns.find(",",c_pos) != std::string::npos)
+                   {
+                       count++;
+                       c_pos = columns.find(",",c_pos)+1;
+                   }
+                   c_pos = 0;
+                   std::vector<DBColumn> dbColumns = std::vector<DBColumn>();
+                   std::vector<DataType> columnTypes = std::vector<DataType>();
+                   for(int c = 0; c < count+1;c++)
+                   {
+                      DBColumn tmpColumn = DBColumn();
+                      int start = 0;
+                      if(c == 0)
+                      {
+                          start = columns.find("(")+1;
+                          if(columns.at(start) == ' ')
+                          {
+                              start++;
+                          }
+                      }
+                      else
+                      {
+                          start = c_pos;
+                      }
+                      int end = columns.find(" ",start);
+                      
+                      std::string tmpName = columns.substr(start,end-start);
+                      if(tmpName.find("PRIMARY") != std::string::npos)
+                      {
+                          std::string tmpPrim = columns.substr(columns.find("(",start)+1,columns.find(")",start)-(columns.find("(",start)+1));
+                          bool found = 0;
+                          for(int z = 0; z < dbColumns.size();z++)
+                          {
+                             if(dbColumns.at(z).name == tmpPrim)
+                             {
+                                 if(verbose)
+                                 {
+                                   std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Setting PRIMARY KEY to column: " << tmpPrim << TERMINAL_NOCOLOR << std::endl;  
+                                 }
+                                 dbColumns.at(z).settingsByte = (dbColumns.at(z).settingsByte | ColumnSettings::PRIMARY_KEY);
+                             }
+                             found = 1;
+                             break;
+                          }
+                          if(!found)
+                          {
+                              response.code = SQL_SYNTAX_ERROR;
+                              return response;
+                          }
+                          c_pos = columns.find(")",start)+1;
+                          continue;
+                      }
+                      tmpColumn.name = tmpName;
+                      start = end+1;
+                      end = columns.find(",",start);
+                      std::string tmpTypeString = columns.substr(start,end-start);
+                      if(tmpTypeString.find(")")+1 != tmpTypeString.length())
+                      {
+                          int index = tmpTypeString.find(")");
+                          std::string cmpString = "";
+                          for(int j = 0; j < tmpTypeString.length()-index;j++)
+                          {
+                            cmpString+=" ";
+                          }
+                          std::string settingsStr = tmpTypeString.substr(index+1,tmpTypeString.length()-index);
+                          if(settingsStr != cmpString)
+                          {
+                              if(verbose)
+                              {
+                                std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Possible Settings for Column: " << tmpColumn.name << TERMINAL_NOCOLOR << std::endl;
+                              }
+                              settingsStr.erase(remove_if(settingsStr.begin(), settingsStr.end(), isspace), settingsStr.end());
+                              if(settingsStr == "NOTNULL")
+                              {
+                                  tmpColumn.settingsByte = tmpColumn.settingsByte | ColumnSettings::NOT_NULL;
+                              }
+                              else
+                              {
+                                 if(verbose)
+                                {
+                                    std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Unknown or unimplemented settings for column: " << '"' << tmpColumn.name << '"' << ". Setting that caused the error: " << settingsStr << TERMINAL_NOCOLOR << std::endl;
+                                }
+                                 response.code = SQL_SYNTAX_ERROR;
+                                 return response;  
+                              }
+                          }
+                      }
+                      if(tmpTypeString.find("(") != std::string::npos)
+                      {
+                          std::string tmpTypeStringNoSize = tmpTypeString.substr(0,tmpTypeString.find("("));
+                          std::transform(tmpTypeStringNoSize.begin(), tmpTypeStringNoSize.end(), tmpTypeStringNoSize.begin(), ::tolower);
+                          if(tmpTypeStringNoSize == "int")
+                          {
+                              tmpColumn.type = DataType::INT;
+                          }
+                          else if (tmpTypeStringNoSize == "varchar")
+                          {
+                              tmpColumn.type = DataType::VARCHAR;
+                          }
+                          else
+                          {
+                            response.code = SQL_NOT_IMPLEMENTED;
+                            return response;
+                          }
+                          int tmpStart = tmpTypeString.find("(")+1;
+                          int tmpEnd = tmpTypeString.find(")");
+                          if(tmpEnd == std::string::npos)
+                          {
+                            response.code = SQL_SYNTAX_ERROR;
+                            return response;
+                          }
+                          std::string columnSize = tmpTypeString.substr(tmpStart,tmpEnd-tmpStart);
+                          tmpColumn.size = std::stoi(columnSize);
+                      }
+                      else
+                      {
+                          std::transform(tmpTypeString.begin(), tmpTypeString.end(), tmpTypeString.begin(), ::tolower);
+                          if(tmpTypeString == "int")
+                          {
+                              tmpColumn.type = DataType::INT;
+                              tmpColumn.size = 8;
+                          }
+                          else if (tmpTypeString == "varchar")
+                          {
+                              tmpColumn.type = DataType::VARCHAR;
+                              tmpColumn.size = 256;
+                          }
+                          else
+                          {
+                            response.code = SQL_NOT_IMPLEMENTED;
+                            return response;
+                          }
+                      }
+                      c_pos = end+2;
+                      dbColumns.push_back(tmpColumn);
+                      
+                   }
+                   size_t vectorSize = 0;
+                   DBColumn* arr = m_ArrayFromVector(dbColumns,vectorSize);
+                   CreateTable(tableName,vectorSize,arr);
+                   response.code = SQLResponseCode::SQL_OK;
+                   delete[] arr;
+                   
+                    
+               }
+               else if(words.at(1) == "index") //Indexing on columns are not easy to make T_T
+               {
+                   AffectedEntities.push_back(SQLEntity::INDEX);
+                   response.code = SQL_NOT_IMPLEMENTED;
+                   break;
+               }
+               else
+               {
+                   response.code = SQLResponseCode::SQL_SCRIPT_ERROR;
+                   if(verbose)
+                   {
+                    std::cout << "[Fatal] {SQL Code Processing} Can't understand SQL Entity: " << words.at(1) << std::endl;
+                    break;
+                   }
+               }
+               
+               
+           }
+           else if(words.at(0) == "delete")
+           {
+               CommandKeys.push_back(SQLCommand::DELETE);
+               
+           }
+           else if(words.at(0) == "insert")
+           {
+               CommandKeys.push_back(SQLCommand::INSERT_INTO);
+               
+           }
+           else
+           {
+               response.code = SQLResponseCode::SQL_SCRIPT_ERROR;
+               if(verbose)
+               {
+                   std::cout << "[Fatal] {SQL Code Processing} Can't understand SQL command: " << words.at(0) << std::endl;
+                   break;
+               }
+           }
+           
+       }
+       
+       
+       return response;
+   }
+   #endif
    
    static DBRow* notable;
    static Key* nokey;
@@ -1790,6 +2183,18 @@ private:
         }
         return tmpVec;
     }
+    template<typename T>
+    T* m_ArrayFromVector(std::vector<T> vec, size_t &arrSize)
+    {
+        T* arr = new T[vec.size()];
+        for(size_t i = 0; i < vec.size();i++)
+        {
+            arr[i] = vec.at(i);
+        }
+        arrSize = vec.size();
+        return arr;
+    }
+    
     
     uchar m_GetColumnType(std::string tableName, std::string columnName)
     {
@@ -1994,6 +2399,15 @@ private:
         for(uint64_t i = 0; i < length; i++)
         {
             m_currDB->DBBuffer[offset+i] = dataToWrite[i];
+        }
+    }
+    
+    void m_PushData(uint64_t from_offset, uint64_t push_length)
+    {
+        for(size_t i = 0; i < m_currDB->DBSize-from_offset-push_length; i++)
+        {
+            //m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[from_offset+push_length-i];
+            m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[m_currDB->DBSize-1-push_length-i];
         }
     }
     
