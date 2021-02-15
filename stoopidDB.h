@@ -90,6 +90,10 @@ uchar g_stoopidDBRowSig[6] = {
 
 std::vector<std::string> CppSplit(std::string str, char seperator) //I hate vectors for the simple reason that I like C-arrays - But I guess it makes sense here
 {
+   if(str.at(0) == seperator)
+   {
+       str.erase(0,1);
+   }
    size_t last = 0;
    std::vector<std::string> arr = std::vector<std::string>();
    for(size_t i = 0; i < str.length();i++)
@@ -1509,7 +1513,7 @@ public:
        SQLResponse response = SQLResponse();
        if(verbose)
        {
-           std::cout << TERMINAL_CYAN << '"' << "PlsNoSQL v1 C++ edition" << '"' << " will be used for SQL Processing." << std::endl << "The keywords and syntax may be a bit different than usual SQL." << std::endl << "Please refer to the documentation for help." << TERMINAL_NOCOLOR << std::endl;
+           std::cout << TERMINAL_CYAN << '"' << "PlsNoSQL v1 C++ edition" << '"' << " will be used for SQL Processing." << std::endl << "The keywords and syntax may differ a bit from usual SQL." << std::endl << "Please refer to the documentation for help." << TERMINAL_NOCOLOR << std::endl;
        }
        size_t pos = sqlQ.find("'", 0);
        std::vector<size_t> indexes = std::vector<size_t>();
@@ -1565,6 +1569,67 @@ public:
            if(words.at(0) == "select")
            {
                CommandKeys.push_back(SQLCommand::SELECT);
+               std::string* columnNames = nullptr;
+               int columnNameEndWord = -1;
+               for(size_t u = 0; u < words.size();u++)
+               {
+                   if(words.at(u).find(")") != std::string::npos)
+                   {
+                       columnNameEndWord = u;
+                       break;
+                   }
+                   if(words.at(u).find("FROM") != std::string::npos) //For future me - check for lower case "FROM" as well
+                   {
+                     break;  
+                   }
+               }
+               if(columnNameEndWord == -1)
+               {
+                   columnNames = new std::string[1];
+                   columnNames[0] = words.at(1);
+               }
+               else
+               {
+                   std::string tmpColumnNameString = "";
+                   for(size_t u = 1; u < columnNameEndWord+1;u++)
+                   {
+                       tmpColumnNameString += words.at(u);
+                   }
+                   if(verbose)
+                   {
+                       std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Combined words from input - Assuming string: "<< '"' << tmpColumnNameString << '"' << " Contains the columnNames" << TERMINAL_NOCOLOR << std::endl;
+                   }
+                   int tmpPos = 0;
+                   /* //This has already been done by the CppSplit function - Keeping it in case it might be needed due to some weird bug or something
+                   while(tmpColumnNameString.find(" ",tmpPos) != std::string::npos)
+                   {
+                       int tmpIndex = tmpColumnNameString.find(" ",tmpPos);
+                       tmpColumnNameString.erase(tmpIndex,1);
+                       tmpPos = tmpIndex+1;
+                   }*/
+                   tmpColumnNameString.erase(0,1);
+                   tmpColumnNameString.erase(tmpColumnNameString.length()-1,1);
+                   tmpPos = 0;
+                   std::vector<std::string> columnNamesVec = std::vector<std::string>();
+                   while(tmpColumnNameString.find(",",tmpPos) != std::string::npos)
+                   {
+                       int tmpIndex = tmpColumnNameString.find(",",tmpPos);
+                       columnNamesVec.push_back(tmpColumnNameString.substr(tmpPos,tmpIndex-tmpPos));
+                       tmpPos = tmpIndex+1;
+                   }
+                   columnNamesVec.push_back(tmpColumnNameString.substr(tmpPos));
+                   if(verbose)
+                   {
+                       std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Assuming columns to be: {" << std::endl;
+                       for(size_t u = 0; u < columnNamesVec.size();u++)
+                       {
+                           std::cout << columnNamesVec.at(u) << std::endl;
+                       }
+                       std::cout << "}" << TERMINAL_NOCOLOR << std::endl;
+                   }
+                   //TODO Return rows and check for "WHERE" - but first Imma create a function to get specific rows from the database
+                   
+               }
            }
            else if(words.at(0) == "update")
            {
@@ -1810,6 +1875,8 @@ public:
        
        return response;
    }
+   DBRow* SqlReturn = nullptr;
+   int SqlReturnLength = 0;
    #endif
    
    static DBRow* notable;
