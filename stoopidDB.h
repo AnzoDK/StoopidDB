@@ -793,6 +793,10 @@ struct DBRow
       Key nKey = Key(field,data);
       keys.push_back(nKey);
   }
+  void InsertData(Key k)
+  {
+      keys.push_back(k);
+  }
   void InsertData(UnsignedString field, UnsignedString data)
   {
       std::string sF = "";
@@ -1555,7 +1559,12 @@ public:
    SQLResponse SQlQuery(std::string sqlQ,bool verbose=false)
    {
        SQLResponse response = SQLResponse();
-       SqlReturn = nullptr;
+       if(SqlReturn != nullptr)
+       {
+            delete[] SqlReturn;
+            SqlReturnLength = 0;
+            SqlReturn = nullptr;
+       }
        SqlReturnLength = 0;
        if(verbose)
        {
@@ -1645,6 +1654,13 @@ public:
                    {
                        tmpColumnNameString += words.at(u);
                    }
+                   //Prevent empty parathesis
+                   if(tmpColumnNameString == "")
+                   {
+                       response.code = SQL_SYNTAX_ERROR;
+                       m_AddError("No column names specified");
+                       return response;
+                   }
                    if(verbose)
                    {
                        std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Combined words from input - Assuming string: "<< '"' << tmpColumnNameString << '"' << " Contains the columnNames" << TERMINAL_NOCOLOR << std::endl;
@@ -1677,6 +1693,7 @@ public:
                        }
                        std::cout << "}" << TERMINAL_NOCOLOR << std::endl;
                    }
+                   columnNames = m_ArrayFromVector(columnNamesVec,columnNamesSize);
                    //TODO Return rows and check for "WHERE" - but first Imma create a function to get specific rows from the database - DONE (Now it's time to create the SQL handle for SELECT)
                    
                    
@@ -1712,11 +1729,45 @@ public:
                }
                if(columnNamesSize == 1 && columnNames[0] == "*")
                {
-                   SqlReturn = GetAllRowsFromTable(tableName, SqlReturnLength);
+                   SqlReturn = m_GetAllRows(tableName);
+                   SqlReturnLength = m_GetRowCount(tableName);
                    response.code = SQL_OK;
                    return response;
                }
-               //TODO Search for 'WHERE'
+               bool usingWhere = 1;
+               try
+               {
+                  std::string strWHERE = words.at(FROM+2);
+               }
+               catch(std::out_of_range)
+               {
+                 usingWhere = 0;  
+               }
+               if(usingWhere)
+               {
+                   //TODO handle WHERE
+                   response.code = SQL_NOT_IMPLEMENTED;
+               }
+               else
+               {
+                   std::vector<DBRow> tmpRows = std::vector<DBRow>();
+                   int tmpresultSize = 0;
+                   DBRow* _rows = GetAllRowsFromTable(tableName,tmpresultSize);
+                   for(int z = 0; z < tmpresultSize;z++)
+                   {
+                       DBRow r = DBRow();
+                       for(int a = 0; a < columnNamesSize; a++)
+                       {
+                        r.InsertData(_rows[z].Find(columnNames[a]));
+                       }
+                       tmpRows.push_back(r);
+                   }
+                   delete[] _rows;
+                   SqlReturn = m_ArrayFromVector(tmpRows,SqlReturnLength);
+                   response.code = SQL_OK;
+                   return response;
+               }
+               
            }
            else if(words.at(0) == "update")
            {
@@ -1963,7 +2014,7 @@ public:
        return response;
    }
    DBRow* SqlReturn = nullptr;
-   int SqlReturnLength = 0;
+   size_t SqlReturnLength = 0;
    #endif
    
    static DBRow* notable;
