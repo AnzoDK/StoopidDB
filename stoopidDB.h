@@ -23,7 +23,7 @@ struct Key
         this->value = value;
     }
     /*
-     * DO NOT USE FOR ANYTHING ELSE, BUT ARRAY CREATION
+     * ONLY MEANT FOR ARRAY CREATION VIA THE NEW KEYWORD
      */
     Key()
     {
@@ -1524,7 +1524,7 @@ public:
        return false;
    }
    
-   bool DeleteRow(std::string tableName, Key where)
+   bool DeleteRow(std::string tableName, Key where) //TODO Add support for multiple conditions
    {
        DBRow* rows = m_GetAllRows(tableName);
        size_t rowCount = m_GetRowCount(tableName);
@@ -1651,8 +1651,8 @@ public:
                        tmpColumnNameString.erase(tmpIndex,1);
                        tmpPos = tmpIndex+1;
                    }*/
-                   tmpColumnNameString.erase(0,1);
-                   tmpColumnNameString.erase(tmpColumnNameString.length()-1,1);
+                   tmpColumnNameString.erase(0,1); //Delete the '('
+                   tmpColumnNameString.erase(tmpColumnNameString.length()-1,1); //Delete the ')'
                    tmpPos = 0;
                    std::vector<std::string> columnNamesVec = std::vector<std::string>();
                    while(tmpColumnNameString.find(",",tmpPos) != std::string::npos)
@@ -1671,7 +1671,7 @@ public:
                        }
                        std::cout << "}" << TERMINAL_NOCOLOR << std::endl;
                    }
-                   //TODO Return rows and check for "WHERE" - but first Imma create a function to get specific rows from the database
+                   //TODO Return rows and check for "WHERE" - but first Imma create a function to get specific rows from the database - DONE (Now it's time to create the SQL handle for SELECT)
                    
                }
            }
