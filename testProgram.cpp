@@ -82,7 +82,7 @@ int main()
     }
     else
     {
-        std::cout << "Printing output of 'SELECT ( id ) FROM Posts;'" << std::endl;
+        std::cout << "Printing output of 'SELECT ( Title, id ) FROM Posts;'" << std::endl;
         RowPrinter(dbMan->SqlReturn,dbMan->SqlReturnLength);
         DBRow row = DBRow();
         row.InsertData("Size","12");
