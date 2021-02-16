@@ -1555,6 +1555,8 @@ public:
    SQLResponse SQlQuery(std::string sqlQ,bool verbose=false)
    {
        SQLResponse response = SQLResponse();
+       SqlReturn = nullptr;
+       SqlReturnLength = 0;
        if(verbose)
        {
            std::cout << TERMINAL_CYAN << '"' << "PlsNoSQL v1 C++ edition" << '"' << " will be used for SQL Processing." << std::endl << "The keywords and syntax may differ a bit from usual SQL." << std::endl << "Please refer to the documentation for help." << TERMINAL_NOCOLOR << std::endl;
@@ -1606,6 +1608,7 @@ public:
        std::vector<SQLCommand> CommandKeys = std::vector<SQLCommand>();
        std::vector<SQLEntity> AffectedEntities = std::vector<SQLEntity>();
        std::vector<std::string> Names = std::vector<std::string>();
+       size_t FROM = 0;
        for(size_t i = 0; i < lines.size();i++)
        {
            std::vector<std::string> words = CppSplit(lines.at(i),' ');
@@ -1614,6 +1617,7 @@ public:
            {
                CommandKeys.push_back(SQLCommand::SELECT);
                std::string* columnNames = nullptr;
+               size_t columnNamesSize = 0;
                int columnNameEndWord = -1;
                for(size_t u = 0; u < words.size();u++)
                {
@@ -1624,13 +1628,15 @@ public:
                    }
                    if(words.at(u).find("FROM") != std::string::npos) //For future me - check for lower case "FROM" as well
                    {
-                     break;  
+                     FROM = u;  
+                     break;
                    }
                }
                if(columnNameEndWord == -1)
                {
                    columnNames = new std::string[1];
                    columnNames[0] = words.at(1);
+                   columnNamesSize = 1;
                }
                else
                {
@@ -1673,7 +1679,44 @@ public:
                    }
                    //TODO Return rows and check for "WHERE" - but first Imma create a function to get specific rows from the database - DONE (Now it's time to create the SQL handle for SELECT)
                    
+                   
                }
+               if(FROM == 0)
+               {
+                   for(size_t z = columnNameEndWord; z < words.size();z++)
+                   {
+                     if(words.at(z) == "FROM")//TODO check for lowercase as well
+                     {
+                         FROM = z;
+                         break;
+                     }
+                     if(FROM == 0)
+                     {
+                         response.code = SQL_SYNTAX_ERROR;
+                         m_AddError("No 'FROM' keyword found");
+                         return response;
+                     }
+                   }
+               }
+               
+               std::string tableName = "";
+               try
+               {
+                   tableName = words.at(FROM+1);
+               }
+               catch(std::out_of_range)
+               {
+                   m_AddError("No table name specified");
+                   response.code = SQL_SYNTAX_ERROR;
+                   return response;
+               }
+               if(columnNamesSize == 1 && columnNames[0] == "*")
+               {
+                   SqlReturn = GetAllRowsFromTable(tableName, SqlReturnLength);
+                   response.code = SQL_OK;
+                   return response;
+               }
+               //TODO Search for 'WHERE'
            }
            else if(words.at(0) == "update")
            {
