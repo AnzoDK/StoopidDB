@@ -1655,7 +1655,7 @@ public:
                        tmpColumnNameString += words.at(u);
                    }
                    //Prevent empty parathesis
-                   if(tmpColumnNameString == "")
+                   if(tmpColumnNameString == "" || tmpColumnNameString == "()")
                    {
                        response.code = SQL_SYNTAX_ERROR;
                        m_AddError("No column names specified");
@@ -1707,13 +1707,13 @@ public:
                          FROM = z;
                          break;
                      }
-                     if(FROM == 0)
+                   }
+                   if(FROM == 0)
                      {
                          response.code = SQL_SYNTAX_ERROR;
                          m_AddError("No 'FROM' keyword found");
                          return response;
                      }
-                   }
                }
                
                std::string tableName = "";
@@ -1734,6 +1734,10 @@ public:
                    response.code = SQL_OK;
                    return response;
                }
+               if(tableName.at(tableName.size()-1) == ';')
+               {
+                   tableName.erase(tableName.size()-1,1);
+               }
                bool usingWhere = 1;
                try
                {
@@ -1753,6 +1757,8 @@ public:
                    std::vector<DBRow> tmpRows = std::vector<DBRow>();
                    int tmpresultSize = 0;
                    DBRow* _rows = GetAllRowsFromTable(tableName,tmpresultSize);
+                   if(_rows != norow)
+                   {
                    for(int z = 0; z < tmpresultSize;z++)
                    {
                        DBRow r = DBRow();
@@ -1766,6 +1772,14 @@ public:
                    SqlReturn = m_ArrayFromVector(tmpRows,SqlReturnLength);
                    response.code = SQL_OK;
                    return response;
+                   }
+                   else
+                   {
+                       std::string err = "Could not find table: " + tableName;
+                       m_AddError(err);
+                       response.code = SQL_NO_TABLE;
+                       return response;
+                   }
                }
                
            }

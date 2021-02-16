@@ -75,12 +75,15 @@ int main()
     RowPrinter(result,bit64ResultSize);
     delete[] result;
 #ifndef NO_SQL
-    if(dbMan->SQlQuery("CREATE TABLE Hats(ID int(8) NOT NULL, Size int(8) NOT NULL, PRIMARY KEY (ID)); SELECT ( Size, ID ) FROM Hats;",1).code != SQLResponseCode::SQL_OK)
+    if(dbMan->SQlQuery("CREATE TABLE Hats(ID int(8) NOT NULL, Size int(8) NOT NULL, PRIMARY KEY (ID)); SELECT ( Title, id ) FROM Posts;",1).code != SQLResponseCode::SQL_OK)
     {
-        std::cout << "Error - as expected" << std::endl;
+        std::cout << TERMINAL_RED << "Error - as expected" << std::endl;
+        std::cout << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
     }
     else
     {
+        std::cout << "Printing output of 'SELECT ( id ) FROM Posts;'" << std::endl;
+        RowPrinter(dbMan->SqlReturn,dbMan->SqlReturnLength);
         DBRow row = DBRow();
         row.InsertData("Size","12");
         std::cout << TERMINAL_GREEN << "No error returned by SQL handler - Testing Database against expected outputs..." << TERMINAL_NOCOLOR<< std::endl;
