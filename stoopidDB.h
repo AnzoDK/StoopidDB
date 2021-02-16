@@ -22,6 +22,14 @@ struct Key
         this->name = name;
         this->value = value;
     }
+    /*
+     * DO NOT USE FOR ANYTHING ELSE, BUT ARRAY CREATION
+     */
+    Key()
+    {
+        name = "";
+        value = "";
+    }
     bool operator==(const Key &k)
     {
         if(name == k.name && value == k.value)
@@ -1296,6 +1304,42 @@ public:
             resultSize = m_GetRowCount(tableName);
             return dbRows;
        }
+   }
+   /*
+    * Key* Conditions format: An array of conditions in the form of a key with a name and a value, where the name is the columnName and the value is the value of the column
+    */
+   DBRow* GetRowsWhere(std::string tableName, Key* conditions, size_t conditionsSize, size_t &resultSize)
+   {    
+       uint64_t exist = TableExist(tableName);
+       if(!exist)
+       {
+           resultSize = 0;
+           return notable;
+       }
+        std::vector<DBRow> rows = std::vector<DBRow>();
+        DBRow* dbRows = m_GetAllRows(tableName);
+        size_t _resultSize = m_GetRowCount(tableName);
+        for(int i = 0; i < _resultSize; i++)
+        {
+            size_t match = 0;
+            for(size_t u = 0; u < conditionsSize; u++)
+            {
+                Key tmpKey = dbRows[i].Find(conditions[u].name);
+                if(tmpKey != *nokey)
+                {
+                    if(tmpKey.value == conditions[u].value)
+                    {
+                        match++;
+                    }
+                }
+            }
+            if(match == conditionsSize)
+            {
+                rows.push_back(dbRows[i]);
+            }
+        }
+        return m_ArrayFromVector(rows,resultSize);
+       
    }
    
    bool InsertRow(std::string tableName, DBRow row)

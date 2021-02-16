@@ -68,6 +68,12 @@ int main()
     std::cout << "Printing table: Titles" << std::endl; 
     RowPrinter(result,resultSize);
     delete[] result;
+    Key conditions[1] = {Key("id","0")};
+    size_t bit64ResultSize = 0;
+    result = dbMan->GetRowsWhere("Posts",conditions,1,bit64ResultSize);
+    std::cout << "Printing result of 'GetRowsWhere Condition: ID=0'" << std::endl;
+    RowPrinter(result,bit64ResultSize);
+    delete[] result;
 #ifndef NO_SQL
     if(dbMan->SQlQuery("CREATE TABLE Hats(ID int(8) NOT NULL, Size int(8) NOT NULL, PRIMARY KEY (ID)); SELECT ( Size, ID ) FROM Hats;",1).code != SQLResponseCode::SQL_OK)
     {
