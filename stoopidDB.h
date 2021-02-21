@@ -3,6 +3,7 @@
  */
 #ifdef WIN32
 typedef unsigned int uint;
+typedef unsigned char u_int8_t; 
 #endif
 #pragma once
 #include <iostream>
