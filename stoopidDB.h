@@ -1,7 +1,7 @@
 /*
  StoopidDB format Created and owned by AnzoDK (Anton F. Rosenørn-Dohn) 2021
  */
-#ifdef WIN32
+#if defined WIN32 || WIN64
 typedef unsigned int uint;
 typedef unsigned char u_int8_t; 
 #endif
