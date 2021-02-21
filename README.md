@@ -5,4 +5,6 @@ StoopidDB is a simple DataBase header that can quickly be added to any project n
 
 For usage information and documentation - please look at the [wiki](https://github.com/AnzoDK/StoopidDB/wiki)
 
+For branch explanation check the included "BranchesExplained.md" file
+
 Special Thanks to "Andreas Kann" for lending me a laptop and 20 minutes of his important life to fix win32
