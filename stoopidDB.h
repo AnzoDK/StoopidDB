@@ -1,6 +1,9 @@
 /*
  StoopidDB format Created and owned by AnzoDK (Anton F. Rosenørn-Dohn) 2021
  */
+#ifdef WIN32
+typedef unsigned int uint;
+#endif
 #pragma once
 #include <iostream>
 #include <iomanip>
@@ -92,19 +95,22 @@ uchar g_stoopidDBRowSig[6] = {
 
 
 /*
+ * ChangeLog: Win32 support added, and a lot of places have changed to uint64_t instead of size_t to prevent 32/64 mismatch and uint64_t is used in many places where it would be ideal to keep the data 64 bits
+ * 
  ChangeLog: Added copyconstructor for UnsignedBuffer - that for some reason accepted using a const UnsignedBuffer& as an argument, due to it having a overloaded operator= that gave it the power to create new UnsignedBuffers from others, without uisng the a copyconstructor. That problem seems to have been solved!!!
  
  */
 
 std::vector<std::string> CppSplit(std::string str, char seperator) //I hate vectors for the simple reason that I like C-arrays - But I guess it makes sense here
+//
 {
    if(str.at(0) == seperator)
    {
        str.erase(0,1);
    }
-   size_t last = 0;
+   uint64_t last = 0;
    std::vector<std::string> arr = std::vector<std::string>();
-   for(size_t i = 0; i < str.length();i++)
+   for(uint64_t i = 0; i < str.length();i++)
    {
      if(str.at(i) == seperator)
      {
@@ -119,10 +125,10 @@ std::vector<std::string> CppSplit(std::string str, char seperator) //I hate vect
    return arr;
 }
 
-char** CSplit(const char* str, size_t strLen, char seperator, size_t &resultSize)
+char** CSplit(const char* str, uint64_t strLen, char seperator, uint64_t &resultSize)
 {
-    size_t count = 0;
-    for(size_t i = 0; i < strLen;i++)
+    uint64_t count = 0;
+    for(uint64_t i = 0; i < strLen;i++)
     {
         if(str[i] == seperator)
         {
@@ -130,13 +136,13 @@ char** CSplit(const char* str, size_t strLen, char seperator, size_t &resultSize
         }
     }
     char** arr = new char*[count];
-    size_t old = 0;
-    for(size_t i = 0; i < strLen;i++)
+    uint64_t old = 0;
+    for(uint64_t i = 0; i < strLen;i++)
     {
         if(str[i] == seperator)
         {
          arr[i] = new char[i-old];
-         for(size_t u = 0; u < i-old;u++)
+         for(uint64_t u = 0; u < i-old;u++)
          {
              arr[i][u] = str[u];
          }
@@ -198,7 +204,7 @@ public:
          m_ucBuffer = nullptr;
          length = 0;
     }
-    explicit UnsignedBuffer(size_t size)
+    explicit UnsignedBuffer(uint64_t size)
     {
         m_ucBuffer = new unsigned char[size];
         length = size;
@@ -213,12 +219,12 @@ public:
             m_ucBuffer[i] = static_cast<unsigned char>(s_buffer[i]);
         }
     }
-    UnsignedBuffer(const char* s_buffer, int _length)
+    UnsignedBuffer(const char* s_buffer, uint64_t _length)
     {
         m_ucBuffer = new unsigned char[_length];
         
         length = _length;
-        for(uint i = 0; i < length;i++)
+        for(uint64_t i = 0; i < length;i++)
         {
             m_ucBuffer[i] = static_cast<unsigned char>(s_buffer[i]);
         }
@@ -232,11 +238,11 @@ public:
           m_ucBuffer[i] = usBuff.m_ucBuffer[i];
       }
     }
-    UnsignedBuffer(uchar* buffer, size_t _length)
+    UnsignedBuffer(uchar* buffer, uint64_t _length)
     {
         length = _length;
         m_ucBuffer = new uchar[length];
-        for(size_t i = 0; i < length;i++)
+        for(uint64_t i = 0; i < length;i++)
         {
             m_ucBuffer[i] = static_cast<unsigned char>(buffer[i]);
         }
@@ -277,9 +283,9 @@ public:
         }
         return tmp_buffer;
     }
-    void InsertAt(UnsignedBuffer buffer, size_t where)
+    void InsertAt(UnsignedBuffer buffer, uint64_t where)
     {
-        for(size_t i = 0; i < buffer.length;i++)
+        for(uint64_t i = 0; i < buffer.length;i++)
         {
             m_ucBuffer[where+i] = buffer.GetBuffer()[i];
             if(where+i >= length-1)
@@ -322,7 +328,7 @@ public:
     }
     bool operator==(const UnsignedBuffer &ubuff)
     {
-        size_t c = 0;
+        uint64_t c = 0;
         bool equal = 1;
         if(length != ubuff.length)
         {
@@ -361,7 +367,7 @@ public:
     static uchar* UcharFromString(std::string str)
     {
         uchar* buff = new uchar[str.length()];
-        for(size_t i = 0; i < str.length();i++)
+        for(uint64_t i = 0; i < str.length();i++)
         {
             buff[i] = static_cast<uchar>(str.at(i));
         }
@@ -376,7 +382,7 @@ public:
         }
     }
 
-    size_t length;
+    uint64_t length;
 protected:
     unsigned char* m_ucBuffer;
 };
@@ -387,13 +393,13 @@ public:
     
     int length()
     {
-        size_t len = strBuffer.length;
+        uint64_t len = strBuffer.length;
         return len;
     }
     std::string ToSigned()
     {
         std::string tmp = "";
-        for(size_t i = 0; i < strBuffer.length;i++)
+        for(uint64_t i = 0; i < strBuffer.length;i++)
         {
             tmp += *strBuffer.at(i);
         }
@@ -408,10 +414,10 @@ public:
         strBuffer = UnsignedBuffer(1);
         strBuffer.GetBuffer()[0] = c;
     }
-    UnsignedString(const uchar buff[], size_t size)
+    UnsignedString(const uchar buff[], uint64_t size)
     {
         strBuffer = UnsignedBuffer(size);
-        for(size_t i = 0; i < size; i++)
+        for(uint64_t i = 0; i < size; i++)
         {
             *strBuffer.at(i) = buff[i];
         }
@@ -575,7 +581,7 @@ public:
         }
         return unequal;
     }
-    static size_t* Search(uchar* buffer, size_t offset, size_t length, uchar* searchTerm, size_t searchTermLength, int &resultSize)
+    static uint64_t* Search(uchar* buffer, uint64_t offset, uint64_t length, uchar* searchTerm, uint64_t searchTermLength, int &resultSize)
     {
         UnsignedBuffer* buff1 = new UnsignedBuffer(searchTerm,searchTermLength);
         int c = 0;
@@ -598,7 +604,7 @@ public:
             delete buff2;
             
         }
-        size_t* indexes = new size_t[resultSize];
+        uint64_t* indexes = new uint64_t[resultSize];
         c = 0;
         int cc = 0;
         while(true)
@@ -620,7 +626,7 @@ public:
         delete buff1;
         return indexes;
     }
-    static size_t* Search(uchar* buffer, size_t offset, size_t length, UnsignedString searchTerm, int &resultSize)
+    static uint64_t* Search(uchar* buffer, uint64_t offset, uint64_t length, UnsignedString searchTerm, int &resultSize)
     {
         int c = 0;
         resultSize = 0;
@@ -645,7 +651,7 @@ public:
         {
           return nullptr;  
         }
-        size_t* indexes = new size_t[resultSize];
+        uint64_t* indexes = new uint64_t[resultSize];
         
         c = 0;
         int cc = 0;
@@ -669,7 +675,7 @@ public:
         delete buff1;
         return indexes;
     }
-    static size_t* SearchFromEnd(uchar* buffer, size_t offset, uchar* searchTerm, size_t searchTermLength, int &resultSize)
+    static uint64_t* SearchFromEnd(uchar* buffer, uint64_t offset, uchar* searchTerm, uint64_t searchTermLength, int &resultSize)
     {
         int c = 0;
         resultSize = 0;
@@ -685,7 +691,7 @@ public:
             }
             c++;
         }
-        size_t* indexes = new size_t[resultSize];
+        uint64_t* indexes = new uint64_t[resultSize];
         c = 0;
         int cc = 0;
         while(true)
@@ -704,7 +710,7 @@ public:
         }
         return indexes;
     }
-    static size_t* SearchFromEnd(uchar* buffer, size_t offset, UnsignedString searchTerm, int &resultSize)
+    static uint64_t* SearchFromEnd(uchar* buffer, uint64_t offset, UnsignedString searchTerm, int &resultSize)
     {
         int c = 0;
         resultSize = 0;
@@ -720,7 +726,7 @@ public:
             }
             c++;
         }
-        size_t* indexes = new size_t[resultSize];
+        uint64_t* indexes = new uint64_t[resultSize];
         c = 0;
         int cc = 0;
         while(true)
@@ -841,7 +847,7 @@ struct SQLResponse
 {
     SQLResponseCode code = SQL_OK;
     DBRow* returnedRows = 0x0;
-    size_t returnedRowsSize = 0;
+    uint64_t returnedRowsSize = 0;
 };
 #endif
 
@@ -850,7 +856,7 @@ struct DataBase
 
    std::string path;
    std::string versionString;
-   size_t DBSize;
+   uint64_t DBSize;
    u_int8_t* DBBuffer = nullptr; 
    bool valid = true;
    std::string Err()
@@ -1129,7 +1135,7 @@ public:
        ResizeDB(combinedSize+m_currDB->DBSize);
        
        //Relocate old data - Must be done backwards to avoid data overwriting itself when tables are smaller than the entry table XD
-       for(size_t u = 0; u < m_currDB->DBSize-allowedWriteOffset-combinedSize;u++)
+       for(uint64_t u = 0; u < m_currDB->DBSize-allowedWriteOffset-combinedSize;u++)
        {
           m_currDB->DBBuffer[m_currDB->DBSize-1-u] = m_currDB->DBBuffer[allowedWriteOffset+(m_currDB->DBSize-allowedWriteOffset-combinedSize-1)-u];
        }
@@ -1206,7 +1212,7 @@ public:
        uint64_t newTableOffset = (allowedWriteOffset+tableLength);
        int size = 0;
        uint64_t newEntryOffset = 0;
-       size_t* results = UnsignedString::Search(m_currDB->DBBuffer, allowedWriteOffset+tableLength, m_currDB->DBSize, entrySig, 6, size);
+       uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer, allowedWriteOffset+tableLength, m_currDB->DBSize, entrySig, 6, size);
        
        std::cout << "Found " << size << " other tables" << std::endl;
        m_WriteDBToDisk();
@@ -1312,7 +1318,7 @@ public:
    /*
     * Key* Conditions format: An array of conditions in the form of a key with a name and a value, where the name is the columnName and the value is the value of the column
     */
-   DBRow* GetRowsWhere(std::string tableName, Key* conditions, size_t conditionsSize, size_t &resultSize)
+   DBRow* GetRowsWhere(std::string tableName, Key* conditions, size_t conditionsSize, uint64_t &resultSize)
    {    
        uint64_t exist = TableExist(tableName);
        if(!exist)
@@ -1322,10 +1328,10 @@ public:
        }
         std::vector<DBRow> rows = std::vector<DBRow>();
         DBRow* dbRows = m_GetAllRows(tableName);
-        size_t _resultSize = m_GetRowCount(tableName);
+        uint64_t _resultSize = m_GetRowCount(tableName);
         for(int i = 0; i < _resultSize; i++)
         {
-            size_t match = 0;
+            uint64_t match = 0;
             for(size_t u = 0; u < conditionsSize; u++)
             {
                 Key tmpKey = dbRows[i].Find(conditions[u].name);
@@ -1400,7 +1406,7 @@ public:
                {
                     m_DirectWrite(newWriteOffset,4,(uchar*)&id);
                     newWriteOffset+=4;
-                    size_t value = 0;
+                    uint64_t value = 0;
                     DataType type = DataType(m_GetColumnType(tableName,row.keys.at(i).name));
                     switch(type)
                     {
@@ -1413,7 +1419,7 @@ public:
                           else if(m_GetColumnDataMaxSize(tableName,row.keys.at(i).name) <= 8 && m_GetColumnDataMaxSize(tableName,row.keys.at(i).name) > 4)
                           {
                               
-                              for(size_t u = 0; u < row.keys.at(i).value.length();u++)
+                              for(uint64_t u = 0; u < row.keys.at(i).value.length();u++)
                               {
                                   char c = row.keys.at(i).value.at(row.keys.at(i).value.length()-1-u);
                                   std::string tmp = "";
@@ -1488,8 +1494,8 @@ public:
    bool ModifyRow(std::string tableName, Key where, Key data)
    {
        DBRow* rows = m_GetAllRows(tableName);
-       size_t rowCount = m_GetRowCount(tableName);
-       for(size_t i = 0; i < rowCount; i++)
+       uint64_t rowCount = m_GetRowCount(tableName);
+       for(uint64_t i = 0; i < rowCount; i++)
        {
            Key tmpK = rows[i].Find(where);
            if(tmpK != *nokey)
@@ -1531,8 +1537,8 @@ public:
    bool DeleteRow(std::string tableName, Key where) //TODO Add support for multiple conditions
    {
        DBRow* rows = m_GetAllRows(tableName);
-       size_t rowCount = m_GetRowCount(tableName);
-       for(size_t i = 0; i < rowCount; i++)
+       uint64_t rowCount = m_GetRowCount(tableName);
+       for(uint64_t i = 0; i < rowCount; i++)
        {
            Key tmpK = rows[i].Find(where);
            if(tmpK != *nokey)
@@ -1544,7 +1550,7 @@ public:
                  return 0;
                }
                uint64_t length = m_GetRowLength(offset);
-               for(size_t i = 0; i < m_currDB->DBSize-offset;i++)
+               for(uint64_t i = 0; i < m_currDB->DBSize-offset;i++)
                {
                    m_currDB->DBBuffer[offset+i] = m_currDB->DBBuffer[offset+length+i];
                }
@@ -1626,7 +1632,7 @@ public:
            {
                CommandKeys.push_back(SQLCommand::SELECT);
                std::string* columnNames = nullptr;
-               size_t columnNamesSize = 0;
+               uint64_t columnNamesSize = 0;
                int columnNameEndWord = -1;
                for(size_t u = 0; u < words.size();u++)
                {
@@ -1976,7 +1982,7 @@ public:
                       dbColumns.push_back(tmpColumn);
                       
                    }
-                   size_t vectorSize = 0;
+                   uint64_t vectorSize = 0;
                    DBColumn* arr = m_ArrayFromVector(dbColumns,vectorSize);
                    CreateTable(tableName,vectorSize,arr);
                    response.code = SQLResponseCode::SQL_OK;
@@ -2028,7 +2034,7 @@ public:
        return response;
    }
    DBRow* SqlReturn = nullptr;
-   size_t SqlReturnLength = 0;
+   uint64_t SqlReturnLength = 0;
    #endif
    
    static DBRow* notable;
@@ -2083,10 +2089,10 @@ private:
         {
           return 0;  
         }
-        size_t offset = m_GetLastColumnEndOffset(tableName);
-        size_t EOT = m_GetEOT(tableName);
+        uint64_t offset = m_GetLastColumnEndOffset(tableName);
+        uint64_t EOT = m_GetEOT(tableName);
         int resultSize = 0;
-        size_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,g_stoopidDBRowSig,6,resultSize);
+        uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,g_stoopidDBRowSig,6,resultSize);
         offset = results[index];
         delete[] results;
         return offset;
@@ -2124,7 +2130,7 @@ private:
      * @param Takes an offset *WITH THE SIGNATURE* and gets the length of the entry.
      * @return rowEntryLength.
      */
-    uint64_t m_GetRowLength(size_t EntryWithSig)
+    uint64_t m_GetRowLength(uint64_t EntryWithSig)
     {
         uint64_t size = 0;
         for(int i = 0; i < 8;i++)
@@ -2137,11 +2143,11 @@ private:
     
     uint64_t m_GetNewRowWriteOffset(std::string tableName)
     {
-        size_t rowsStart = m_GetLastColumnEndOffset(tableName);
-        size_t rowsSize = m_GetEOT(tableName)-rowsStart;
+        uint64_t rowsStart = m_GetLastColumnEndOffset(tableName);
+        uint64_t rowsSize = m_GetEOT(tableName)-rowsStart;
         int rows = 0;
-        size_t* offsets = UnsignedString::Search(m_currDB->DBBuffer,rowsStart,rowsSize,g_stoopidDBRowSig,6,rows);
-        size_t returnOffset = m_GetLastColumnEndOffset(tableName);
+        uint64_t* offsets = UnsignedString::Search(m_currDB->DBBuffer,rowsStart,rowsSize,g_stoopidDBRowSig,6,rows);
+        uint64_t returnOffset = m_GetLastColumnEndOffset(tableName);
         for(int i = 0; i < rows; i++)
         {
             returnOffset += m_GetRowLength(offsets[i]);
@@ -2157,7 +2163,7 @@ private:
     {
         uint32_t offsetsSize = 0;
         uint64_t* offsets = m_GetAllEntryOffsets(offsetsSize);
-        size_t namesSize = 0;
+        uint32_t namesSize = 0;
         std::string* names = m_ScanForTableNames(namesSize);
         if(offsetsSize < namesSize)
         {
@@ -2178,7 +2184,7 @@ private:
                   if(m_ReadString(offset,255) != names[i])
                   {
                       std::cout << "[Non-Fatal] Entry pointer completly lost - Rebuiling entry" << std::endl;
-                      size_t size = 0;
+                      uint32_t size = 0;
                       uint64_t* sets = m_ScanForTableNameOffsets(size);
                       offset = sets[i];
                       delete[] sets;
@@ -2199,7 +2205,7 @@ private:
      *@param Scans for names of tables without using the entry table - Useful if you suspect the entry table to be corrupted - However it does depend on the size of the tables being recorded acurately
      *
      */
-    std::string* m_ScanForTableNames(size_t &arraySize)
+    std::string* m_ScanForTableNames(uint32_t &arraySize)
     {
        uint32_t count = m_GetTableCount();
        arraySize = count;
@@ -2219,7 +2225,7 @@ private:
        return arr;
        
     }
-    uint64_t* m_ScanForTableNameOffsets(size_t &arraySize)
+    uint64_t* m_ScanForTableNameOffsets(uint32_t &arraySize)
     {
        uint32_t count = m_GetTableCount();
        arraySize = count;
@@ -2249,9 +2255,9 @@ private:
             return 0x0; //Error equal to nullptr
         }
         DBRow* dbRows = m_GetAllRows(tableName);
-        for(size_t i = 0; i < rows; i++)
+        for(uint32_t i = 0; i < rows; i++)
         {
-            for(size_t u = 0; i < dbRows[i].keys.size();u++)
+            for(uint64_t u = 0; i < dbRows[i].keys.size();u++)
             {
             if(dbRows[i].keys.at(u).name == primKeyName)
             {
@@ -2271,14 +2277,14 @@ private:
     
     std::string m_GetPrimaryKey(std::string tableName)
     {
-        size_t offset = m_GetColumnsStart(tableName);
-        size_t columnCount = m_GetColumnCount(tableName);
+        uint64_t offset = m_GetColumnsStart(tableName);
+        uint32_t columnCount = m_GetColumnCount(tableName);
         std::string* names = m_GetAllColumnNames(tableName);
-        for(size_t i = 0; i < columnCount; i++)
+        for(uint32_t i = 0; i < columnCount; i++)
         {
             UnsignedString tmp = m_ReadUnsignedString(offset,255,1);
-            size_t columnSize = m_ReadUnsingedValue(4, offset+tmp.length());
-            size_t nextOffset = offset+columnSize;
+            uint64_t columnSize = m_ReadUnsingedValue(4, offset+tmp.length());
+            uint64_t nextOffset = offset+columnSize;
             uchar settingsByte = m_ReadUnsingedValue(1,offset+tmp.length()+4+1);
             uchar binOpResult = settingsByte & (uchar)0b00100000;
             if(binOpResult == (uint)0b100000)
@@ -2300,30 +2306,30 @@ private:
     
     DBRow* m_GetAllRows(std::string tableName, bool ignoreNewest=false)
     {
-        size_t rowCount = m_GetRowCount(tableName);
+        uint32_t rowCount = m_GetRowCount(tableName);
         DBRow* rows = new DBRow[rowCount];
-        size_t offset = m_GetLastColumnEndOffset(tableName);
-        size_t EOT = m_GetEOT(tableName);
+        uint64_t offset = m_GetLastColumnEndOffset(tableName);
+        uint64_t EOT = m_GetEOT(tableName);
         int resultSize = 0;
-        size_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,g_stoopidDBRowSig,6,resultSize);
-        for(size_t i = 0; i < (ignoreNewest==true ? rowCount-1 : rowCount); i++)
+        uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,g_stoopidDBRowSig,6,resultSize);
+        for(uint32_t i = 0; i < (ignoreNewest==true ? rowCount-1 : rowCount); i++)
         {
-            size_t rowOffset = 0;
-            size_t rowLength = m_GetRowLength(results[i]);
+            uint64_t rowOffset = 0;
+            uint64_t rowLength = m_GetRowLength(results[i]);
             while(true)
             {
                 std::string columnName = m_GetColumnNameFromID(tableName,m_ReadUnsingedValue(4,results[i]+6+8+rowOffset));
-                size_t columnMAX = m_GetColumnDataMaxSize(tableName,columnName);
+                uint32_t columnMAX = m_GetColumnDataMaxSize(tableName,columnName);
                 DataType type = DataType(m_GetColumnType(tableName,columnName));
                 std::string dataString = "";
                 switch(type)
                 {
                     case DataType::INT:{
                         UnsignedString uData = m_ReadUnsignedString(results[i]+6+8+4+rowOffset,columnMAX,0);
-                        size_t tmp = 0;
+                        uint32_t tmp = 0;
                         if(columnMAX <= 8)
                         {
-                        for(size_t u = 0; u < columnMAX; u++)
+                        for(uint32_t u = 0; u < columnMAX; u++)
                         {
                             
                             tmp = (tmp | uData.at(columnMAX-1-u)) << (u == columnMAX-1 ? 0 : 8);
@@ -2368,7 +2374,7 @@ private:
         return rows;
     }
     
-    std::string m_GetColumnNameFromID(std::string tableName, size_t id)
+    std::string m_GetColumnNameFromID(std::string tableName, uint32_t id)
     {
         std::string name = "";
         std::string* names = m_GetAllColumnNames(tableName);
@@ -2380,7 +2386,7 @@ private:
     
     uchar m_GetColumnSettings(std::string tableName, std::string columnName)
     {
-       size_t offset =  m_GetColumnOffset(tableName,columnName);
+       uint64_t offset =  m_GetColumnOffset(tableName,columnName);
        UnsignedString utmp = m_ReadUnsignedString(offset,255);
        uchar settings = m_ReadUnsingedValue(1,offset+utmp.length()+4+1);
        if(settings == 0)
@@ -2393,20 +2399,20 @@ private:
     }
     
     template<typename T>
-    std::vector<T> m_VectorFromArray(T* arr, size_t len)
+    std::vector<T> m_VectorFromArray(T* arr, uint64_t len)
     {
         std::vector<T> tmpVec = std::vector<T>();
-        for(size_t i = 0; i < len; i++)
+        for(uint64_t i = 0; i < len; i++)
         {
             tmpVec.push_back(arr[i]);
         }
         return tmpVec;
     }
     template<typename T>
-    T* m_ArrayFromVector(std::vector<T> vec, size_t &arrSize)
+    T* m_ArrayFromVector(std::vector<T> vec, uint64_t &arrSize)
     {
         T* arr = new T[vec.size()];
-        for(size_t i = 0; i < vec.size();i++)
+        for(uint64_t i = 0; i < vec.size();i++)
         {
             arr[i] = vec.at(i);
         }
@@ -2420,9 +2426,9 @@ private:
        return m_ReadUnsingedValue(1,m_GetColumnOffset(tableName,columnName)+columnName.length()+1+4);  
     }
     
-    bool m_WriteAutoAndUpdateOffset(std::string tableName, size_t &offset)
+    bool m_WriteAutoAndUpdateOffset(std::string tableName, uint64_t &offset)
     {
-        size_t rowCount = m_GetRowCount(tableName);
+        uint32_t rowCount = m_GetRowCount(tableName);
         std::string primKey = m_GetPrimaryKey(tableName);
         if(primKey == "")
         {
@@ -2430,7 +2436,7 @@ private:
           return false;  
         }
         
-        size_t currAutoInc = 0xFFFFFFFFFFFFFFFF;
+        uint64_t currAutoInc = 0xFFFFFFFFFFFFFFFF;
         if(rowCount-1 > 0)
         {
             DBRow* rows = m_GetAllRows(tableName,1);
@@ -2463,10 +2469,10 @@ private:
         }
     }
     
-    size_t m_CalculateSpaceForUnassignedColumns(std::string tableName, std::vector<Key> assignedColumns)
+    uint64_t m_CalculateSpaceForUnassignedColumns(std::string tableName, std::vector<Key> assignedColumns)
     {
         
-        size_t extraSize = 0;
+        uint64_t extraSize = 0;
         
         //For all columns marked as NOT NULL
         uint32_t columnCount = m_GetColumnCount(tableName);
@@ -2474,10 +2480,10 @@ private:
         
         std::vector<std::string> tmpVec = m_VectorFromArray<std::string>(names, columnCount);
         
-        for(size_t i = 0; i < assignedColumns.size(); i++)
+        for(uint32_t i = 0; i < assignedColumns.size(); i++)
         {
             std::string name = assignedColumns.at(i).name;
-            for(size_t u = 0; u < tmpVec.size();u++)
+            for(uint32_t u = 0; u < tmpVec.size();u++)
             {
                 if(tmpVec.at(u) == name)
                 {
@@ -2486,7 +2492,7 @@ private:
             }
             
         }
-        for(size_t i = 0; i < tmpVec.size();i++)
+        for(uint32_t i = 0; i < tmpVec.size();i++)
         {
             if(tmpVec.at(i) != "")
             {
@@ -2506,9 +2512,9 @@ private:
         
     }
     
-    size_t m_ReadUnsingedValue(uint bytesToRead, size_t offset)
+    uint64_t m_ReadUnsingedValue(uint bytesToRead, uint64_t offset)
     {
-        size_t data = 0;
+        uint64_t data = 0;
         for(uint i = 0; i < bytesToRead;i++)
         {
             data = (data | m_currDB->DBBuffer[offset+bytesToRead-1-i]) << (i == bytesToRead-1 ? 0: 8);
@@ -2518,10 +2524,10 @@ private:
     
     uint32_t m_GetRowCount(std::string tableName)
     {
-        size_t offset = m_GetLastColumnEndOffset(tableName);
-        size_t EOT = m_GetEOT(tableName);
+        uint64_t offset = m_GetLastColumnEndOffset(tableName);
+        uint64_t EOT = m_GetEOT(tableName);
         int resultSize = 0;
-        size_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,UnsignedString(g_stoopidDBRowSig,6),resultSize);
+        uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,UnsignedString(g_stoopidDBRowSig,6),resultSize);
         delete[] results;
         return static_cast<uint32_t>(resultSize);
     }
@@ -2601,7 +2607,7 @@ private:
     void m_DirectWriteNullFill(uint64_t offset, uint64_t realLength ,uint64_t nullFilledLength, const char* dataToWrite)
     {
         uchar* data = new uchar[realLength];
-        for(size_t i = 0; i < realLength;i++)
+        for(uint64_t i = 0; i < realLength;i++)
         {
             data[i] = static_cast<uchar>(dataToWrite[i]);
         }
@@ -2623,7 +2629,7 @@ private:
     
     void m_PushData(uint64_t from_offset, uint64_t push_length)
     {
-        for(size_t i = 0; i < m_currDB->DBSize-from_offset-push_length; i++)
+        for(uint64_t i = 0; i < m_currDB->DBSize-from_offset-push_length; i++)
         {
             //m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[from_offset+push_length-i];
             m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[m_currDB->DBSize-1-push_length-i];
@@ -2631,7 +2637,7 @@ private:
     }
     void m_PullData(uint64_t offset, uint64_t pull_length)
     {
-        for(size_t i = 0; i < m_currDB->DBSize-offset-pull_length; i++)
+        for(uint64_t i = 0; i < m_currDB->DBSize-offset-pull_length; i++)
         {       
             //m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[m_currDB->DBSize-1-pull_length-i];
             m_currDB->DBBuffer[offset+i] = m_currDB->DBBuffer[offset+pull_length+i];
@@ -2837,7 +2843,7 @@ private:
         return utmp; 
     }
     
-    void ResizeDB(size_t newSize, bool echo=false)
+    void ResizeDB(uint64_t newSize, bool echo=false)
     {
         if(echo)
         {
@@ -2875,14 +2881,14 @@ private:
         
     }
     
-    size_t TableExist(std::string name)
+    uint64_t TableExist(std::string name)
     {
        uint64_t Offset = 0;
        uchar* sig = new uchar[8]{'\0',static_cast<uchar>('\xFF'),static_cast<uchar>('\xFF'),'\0','\0',static_cast<uchar>('\xFF'),static_cast<uchar>('\xFF'),'\0'};
        UnsignedString uname = UnsignedString(name);
        int resultSize = 0;
        
-       size_t* results = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), m_currDB->DBSize,sig,8,resultSize);
+       uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), m_currDB->DBSize,sig,8,resultSize);
        if(resultSize == 0)
        {
            std::cout << TERMINAL_RED << "DB Corrupted!! - No EntryTableSignature found!!" << TERMINAL_NOCOLOR << std::endl;
@@ -2890,10 +2896,10 @@ private:
            delete[] sig;
            return 0;
        }
-       size_t end = results[0];
+       uint64_t end = results[0];
        
        //result = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), end, UnsignedBuffer(name.c_str(),name.length()).GetBuffer(), name.length(), resultSize);
-       size_t* result = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), end, uname, resultSize); //Sigh - The buffer that holds the name deletes it self in the middle if a while loop... WTF!!!!!!! - Fixed for some reason the overloaded "=" operator was used instead of the copyconstructor
+       uint64_t* result = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), end, uname, resultSize); //Sigh - The buffer that holds the name deletes it self in the middle if a while loop... WTF!!!!!!! - Fixed for some reason the overloaded "=" operator was used instead of the copyconstructor
        
        if(resultSize == 0)
        {

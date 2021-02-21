@@ -69,7 +69,7 @@ int main()
     RowPrinter(result,resultSize);
     delete[] result;
     Key conditions[1] = {Key("id","0")};
-    size_t bit64ResultSize = 0;
+    uint64_t bit64ResultSize = 0;
     result = dbMan->GetRowsWhere("Posts",conditions,1,bit64ResultSize);
     std::cout << "Printing result of 'GetRowsWhere Condition: ID=0'" << std::endl;
     RowPrinter(result,bit64ResultSize);
