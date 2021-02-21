@@ -1535,7 +1535,39 @@ public:
        return false;
    }
    
-   bool DeleteRow(std::string tableName, Key where) //TODO Add support for multiple conditions
+   bool DeleteTable(std::string tableName) //I mean who needs tables anyway XD
+   {
+       //Get the offset and end of the table
+       uint64_t startOffset = TableExist(tableName);
+       
+       if(startOffset != 0)
+       {
+            uint64_t endOffset = m_GetEOT(tableName);
+            //Sanity test
+            if(endOffset <= startOffset)
+            {
+                m_AddError("Offsets are completly lost - Try a table rebuild");
+                return 0;
+            }
+            uint64_t size = endOffset-startOffset;
+            m_PullData(startOffset,size);
+            //Resize should clear space for both the old entry and table
+            //ResizeDB(m_currDB->DBSize-size-(tableName.length()+1+8),1); //+1 for NULL terminator and + 8 for OFFSET
+            ResizeDB(m_currDB->DBSize-size);
+            m_FixEntryTable(-size);
+       }
+       else
+       {
+           m_AddError("Could not find table");
+           return 0;
+       }
+       m_WriteDBToDisk();
+       return 1;
+       
+       
+   }
+   
+   bool DeleteRow(std::string tableName, Key where) //TODO Add support for multiple conditions //Lol ofc XDXDXDXD
    {
        DBRow* rows = m_GetAllRows(tableName);
        uint64_t rowCount = m_GetRowCount(tableName);
@@ -2160,7 +2192,7 @@ private:
     /*
      * @param Updates offsets in the entry table by reading tablenames without the help of the entrytable and checks if offsets are correct - and if not attempts to fix them - Useful after a resize operation
      */
-    void m_FixEntryTable(size_t expandSize)
+    void m_FixEntryTable(int64_t expandSize)
     {
         uint32_t offsetsSize = 0;
         uint64_t* offsets = m_GetAllEntryOffsets(offsetsSize);
@@ -2169,6 +2201,14 @@ private:
         if(offsetsSize < namesSize)
         {
             m_AddError("[Non-Fatal] Entry table is missing entries - Full rebuild of entry table is recommended");
+        }
+        else if(namesSize < offsetsSize)
+        {
+            m_AddError("[Non-Fatal] Entry table has entries for deleted tables - Applies workaround (full table rebuild)");
+            //Setting rebuild by overwriting the offsets array with a full scan versionString
+            delete[] offsets;
+            offsets = m_ScanForTableNameOffsets(offsetsSize);
+            
         }
         for(uint32_t i = 0; i < offsetsSize;i++)
         {
@@ -2200,6 +2240,7 @@ private:
         delete[] names;
         delete[] offsets;
         
+        
     }
     
     /*
@@ -2208,7 +2249,8 @@ private:
      */
     std::string* m_ScanForTableNames(uint32_t &arraySize)
     {
-       uint32_t count = m_GetTableCount();
+       //uint32_t count = m_GetTableCount(); // AGAIN SCAN FUNCTIONS SHOULD **NEVER** USE THE FUCKING ENTRYTABLE AS SCAN EXPECTS IT TO BE FUCKED!!!
+       uint32_t count = m_ScanForTableCount(); //<<-- Do this
        arraySize = count;
        uint64_t offset = 0;
        std::string* arr = new std::string[count]; 
@@ -2228,7 +2270,8 @@ private:
     }
     uint64_t* m_ScanForTableNameOffsets(uint32_t &arraySize)
     {
-       uint32_t count = m_GetTableCount();
+       //uint32_t count = m_GetTableCount(); //Relies on m_GetEntryPointer which is not reliable in SCAN functions as SCAN functions are meant to be used when the table is fucked
+       uint32_t count = m_ScanForTableCount(); //<<-- Do this
        arraySize = count;
        uint64_t offset = 0;
        uint64_t* arr = new uint64_t[count]; 
@@ -2303,6 +2346,17 @@ private:
         return "";
         
         
+    }
+    
+    uint32_t m_ScanForTableCount()//ONLY USE WHEN THE TABLE IS **COMPLETlY** FUCKED AS THIS WASTES SOOOOOO MUCH PROCESSING POWER
+    {
+        uint32_t count = 0;
+        for(uint64_t i = 12; i < m_currDB->DBSize;i++)
+        {
+            i = m_ReadUnsingedValue(8,m_ReadUnsignedString(i,255).length()); //TODO Make sure that we don't find empty or made up tables
+            count++;
+        }
+        return count;
     }
     
     DBRow* m_GetAllRows(std::string tableName, bool ignoreNewest=false)
@@ -2881,7 +2935,9 @@ private:
         }
         
     }
-    
+    /*
+     * @param Returns 0 on fail and the Offset on sucess - should always be tested against a "0" to make sure the system is working with a valid table
+     */
     uint64_t TableExist(std::string name)
     {
        uint64_t Offset = 0;
