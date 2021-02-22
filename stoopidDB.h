@@ -1,5 +1,10 @@
 /*
  StoopidDB format Created and owned by AnzoDK (Anton F. Rosenørn-Dohn) 2021
+ 
+ IMPORTANT INFO FROM AnzoDK - There are two types of functions in this file: GET and SCAN.
+ SCAN are meant to be check the whole buffer for the information required and GET are meant to ask the entry table (if applicable).
+ If modifications to this file is made and/or new functions are created, it would be wise to keep this concept in mind to not confuse older users.
+ 
  */
 #if defined (WIN32) || defined(WIN64)
 typedef unsigned int uint;
@@ -1550,7 +1555,11 @@ public:
                 return 0;
             }
             uint64_t size = endOffset-startOffset;
+            //Repair all other table EOT's before pulling the data - This fixes wrong EOT reads when a table is deleted, and an EOT is read from a table that used to be further down in the data
+            m_ModifyEOT(-1,-size); //-1 means all tables - this will also effect the table we're currently deleting, but as we are deleting it, it doesn't matter
             m_PullData(startOffset,size);
+            m_NullFill(m_currDB->DBSize-size-1,size); //Not necessary, but makes it easier to see the changes if the DB file is inspected in a hex-editor
+            m_WriteDBToDisk(); //DEBUG
             //Resize should clear space for both the old entry and table
             //ResizeDB(m_currDB->DBSize-size-(tableName.length()+1+8),1); //+1 for NULL terminator and + 8 for OFFSET
             ResizeDB(m_currDB->DBSize-size);
@@ -1796,7 +1805,7 @@ public:
                    std::vector<DBRow> tmpRows = std::vector<DBRow>();
                    int tmpresultSize = 0;
                    DBRow* _rows = GetAllRowsFromTable(tableName,tmpresultSize);
-                   if(_rows != norow)
+                   if(_rows != notable && _rows != norow)
                    {
                    for(int z = 0; z < tmpresultSize;z++)
                    {
@@ -2173,7 +2182,27 @@ private:
         return size;
     }
     
-    
+    /*
+     * 
+     * @param Takes a table index and a offsetChange and modifies the requested table EOT, based on when it appears in the data - this index can be retrived through m_GetTableIndex() - Both this and m_GetTableIndex expects the entry table to work
+     */
+    void m_ModifyEOT(int tableIndex, int64_t offsetChange)
+    {
+      if(tableIndex == -1)
+      {
+        uint32_t tableCount = m_GetTableCount();
+        uint32_t nameCount = 0;
+        std::string* names = m_GetTableNames(nameCount);
+        if(nameCount != tableCount)
+        {
+            m_AddError("[NOT FATAL] WARNING: m_GetTableCount and m_GetTableNames do not agree on the amount of tables. Be careful!");
+        }
+        for(uint32_t i = 0; i < tableCount; i++)
+        {
+            m_RewriteEOT(names[i],m_GetEOT(names[i])+offsetChange);
+        }
+      }
+    }
     uint64_t m_GetNewRowWriteOffset(std::string tableName)
     {
         uint64_t rowsStart = m_GetLastColumnEndOffset(tableName);
@@ -2198,20 +2227,22 @@ private:
         uint64_t* offsets = m_GetAllEntryOffsets(offsetsSize);
         uint32_t namesSize = 0;
         std::string* names = m_ScanForTableNames(namesSize);
+        bool rebuild = 0;
         if(offsetsSize < namesSize)
         {
             m_AddError("[Non-Fatal] Entry table is missing entries - Full rebuild of entry table is recommended");
+            rebuild = 1;
         }
         else if(namesSize < offsetsSize)
         {
             m_AddError("[Non-Fatal] Entry table has entries for deleted tables - Applies workaround (full table rebuild)");
-            //Setting rebuild by overwriting the offsets array with a full scan versionString
-            delete[] offsets;
-            offsets = m_ScanForTableNameOffsets(offsetsSize);
+            rebuild = 1;
             
         }
-        for(uint32_t i = 0; i < offsetsSize;i++)
+        if(!rebuild)
         {
+            for(uint32_t i = 0; i < offsetsSize;i++)
+            {
               uint64_t offset = 0;
               std::string tmp_name = m_ReadString(offsets[i]+6+4,255);
               for(int u = 0; u < 8; u++)
@@ -2236,6 +2267,19 @@ private:
                 //m_currDB->DBBuffer[offsets[i]+6+4+tmp_name.length()+1+7-u] = (uchar)((uchar*)&offset)[u]; //< -- This is the method used for reading the data not writing it - as this writes in the big-endian, which makes the little endian reader fucked
                 m_currDB->DBBuffer[offsets[i]+6+4+tmp_name.length()+1+u] = (uchar)((uchar*)&offset)[u]; //<-- This is a fine little endian writer.
               }
+            }
+        }
+        else
+        {
+            //Setting rebuild by overwriting the offsets array with a full scan versionString
+            delete[] offsets;
+            offsets = m_ScanForTableNameOffsets(offsetsSize);
+            //Let's just assume that at least the first entry in the table exists.
+            int tableOffsetSize = 0;
+            uint64_t* tableOffsetArray = UnsignedString::Search(m_currDB->DBBuffer,offsets[offsetsSize-1],m_currDB->DBSize, g_stoopidDBEntrySig,6,tableOffsetSize);
+            uint64_t newTableOffset = tableOffsetArray[0];
+            delete[] tableOffsetArray;
+            m_CreateNewEntryTable(newTableOffset);
         }
         delete[] names;
         delete[] offsets;
@@ -2243,13 +2287,35 @@ private:
         
     }
     
+    std::string* m_GetTableNames(uint32_t &arraySize)//**NOT** A SCAN FUNCTION - So we expect the table to work
+    {
+        uint64_t* entOffsets = m_GetAllEntryOffsets(arraySize);
+        std::string* names = new std::string[arraySize];
+        for(uint32_t i = 0; i < arraySize;i++)
+        {
+            names[i] = m_GetTableNameFromEntry(entOffsets[i]);
+        }
+        return names;
+        
+        
+        
+    } 
+    
     /*
+     * @param Takes a an entry **WITH** signature and returns the name of the table from the entry
+     */
+    std::string m_GetTableNameFromEntry(uint64_t entry)
+    {
+        return m_ReadString(entry+6+4,255);
+    }
+    
+        /*
      *@param Scans for names of tables without using the entry table - Useful if you suspect the entry table to be corrupted - However it does depend on the size of the tables being recorded acurately
      *
      */
     std::string* m_ScanForTableNames(uint32_t &arraySize)
     {
-       //uint32_t count = m_GetTableCount(); // AGAIN SCAN FUNCTIONS SHOULD **NEVER** USE THE FUCKING ENTRYTABLE AS SCAN EXPECTS IT TO BE FUCKED!!!
+       //uint32_t count = m_GetTableCount(); // AGAIN "SCAN"-FUNCTIONS SHOULD **NEVER** USE THE FUCKING ENTRYTABLE AS SCAN EXPECTS IT TO BE FUCKED!!!
        uint32_t count = m_ScanForTableCount(); //<<-- Do this
        arraySize = count;
        uint64_t offset = 0;
@@ -2268,6 +2334,52 @@ private:
        return arr;
        
     }
+    
+    void m_CreateNewEntryTable(uint64_t offset)
+    {
+        uint64_t currOffset = offset;
+        uint32_t namesSize = 0;
+        std::string* names = m_ScanForTableNames(namesSize);
+        std::cout << "Found names: " << std::endl << "[START]" << std::endl;
+        for(uint32_t i = 0; i < namesSize;i++)
+        {
+            std::cout << names[i] << std::endl;
+        }
+        std::cout << "[END]" << std::endl;
+        uint32_t expectedSize = 0;
+        for(uint32_t i = 0; i < namesSize; i++)
+        {
+            expectedSize+=names[i].length()+1+8+6+4; //+1 for Null terminator, +4 for entry length, +8 for offset and +6 for ENT signature
+        }
+        expectedSize+=8+8; //+8 For end signature and +8 for last 8 bytes of file
+        if(offset+expectedSize > m_currDB->DBSize)
+        {
+            ResizeDB(offset+expectedSize,1);
+        }
+        uint32_t offsetsSize = 0;
+        uint64_t* offsets = m_ScanForTableNameOffsets(offsetsSize);
+        for(uint32_t i = 0; i < offsetsSize;i++)
+        {
+            m_DirectWrite(currOffset,6,g_stoopidDBEntrySig);
+            currOffset+=6;
+            uint32_t entSize = names[i].length()+1+6+8+4;
+            m_DirectWrite(currOffset,4,(uchar*)&entSize); //+1 for nullterminator, +6 for signature, and +8 for offset
+            currOffset+=4; //+4 for entry size
+            m_DirectWriteNullFill(currOffset,names[i].length(),names[i].length()+1,names[i].c_str());
+            currOffset+=names[i].length()+1;
+            m_DirectWrite(currOffset,8,(uchar*)&offsets[i]);
+            currOffset+=8;
+        }
+        m_DirectWrite(currOffset,8,g_stoopidDBTableSig);
+        currOffset+=8;
+        ResizeDB(currOffset+8,1);
+        delete[] offsets;
+        delete[] names;
+        m_DirectWrite(m_currDB->DBSize-8,8,(uchar*)&offset);
+        m_WriteDBToDisk();
+        std::cout << "Created new table" << std::endl;
+    }
+    
     uint64_t* m_ScanForTableNameOffsets(uint32_t &arraySize)
     {
        //uint32_t count = m_GetTableCount(); //Relies on m_GetEntryPointer which is not reliable in SCAN functions as SCAN functions are meant to be used when the table is fucked
@@ -2351,10 +2463,10 @@ private:
     uint32_t m_ScanForTableCount()//ONLY USE WHEN THE TABLE IS **COMPLETlY** FUCKED AS THIS WASTES SOOOOOO MUCH PROCESSING POWER
     {
         uint32_t count = 0;
-        for(uint64_t i = 12; i < m_currDB->DBSize;i++)
+        for(uint64_t i = 12; i < m_currDB->DBSize;i+=0)
         {
-            i = m_ReadUnsingedValue(8,m_ReadUnsignedString(i,255).length()); //TODO Make sure that we don't find empty or made up tables
-            count++;
+            i = m_ReadUnsingedValue(8,i+m_ReadUnsignedString(i,255).length()); //TODO Make sure that we don't find empty or made up tables
+            if(i < m_currDB->DBSize){ count++;}
         }
         return count;
     }
@@ -2928,6 +3040,15 @@ private:
     void m_RewriteEOT(std::string tableName, uint64_t newEOT) //assumes that a check for the existance of the table has been done before
     {
         uint64_t offset = TableExist(tableName);
+        std::string tmp_name = m_ReadString(offset,255);
+        for(int i = 0; i < 8; i++)
+        {
+            m_currDB->DBBuffer[offset+tmp_name.length()+i+1] = (uchar)((uchar*)&newEOT)[i];
+        }
+        
+    }
+    void m_ForceRewriteEOT(uint64_t offset, uint64_t newEOT) //assumes that a check for the existance of the table has been done before
+    {
         std::string tmp_name = m_ReadString(offset,255);
         for(int i = 0; i < 8; i++)
         {
