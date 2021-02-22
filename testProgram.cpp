@@ -74,6 +74,7 @@ int main()
     std::cout << "Printing result of 'GetRowsWhere Condition: ID=0'" << std::endl;
     RowPrinter(result,bit64ResultSize);
     delete[] result;
+    dbMan->DeleteTable("Users");
 #ifndef NO_SQL
     if(dbMan->SQlQuery("CREATE TABLE Hats(ID int(8) NOT NULL, Size int(8) NOT NULL, PRIMARY KEY (ID)); SELECT ( Title, id ) FROM Posts;",1).code != SQLResponseCode::SQL_OK)
     {
