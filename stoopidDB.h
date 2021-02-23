@@ -99,14 +99,6 @@ uchar g_stoopidDBRowSig[6] = {
            static_cast<uchar>('\0')
            };
 
-
-/*
- * ChangeLog: Win32 support added, and a lot of places have changed to uint64_t instead of size_t to prevent 32/64 mismatch and uint64_t is used in many places where it would be ideal to keep the data 64 bits
- * 
- ChangeLog: Added copyconstructor for UnsignedBuffer - that for some reason accepted using a const UnsignedBuffer& as an argument, due to it having a overloaded operator= that gave it the power to create new UnsignedBuffers from others, without uisng the a copyconstructor. That problem seems to have been solved!!!
- 
- */
-
 std::vector<std::string> CppSplit(std::string str, char seperator) //I hate vectors for the simple reason that I like C-arrays - But I guess it makes sense here
 //
 {
@@ -356,7 +348,7 @@ public:
         }
         return equal;
     }
-    void Resize(uint newSize)
+    void Resize(uint newSize)//Use m_PullData or m_PushData instead
     {
         
         
@@ -1066,30 +1058,12 @@ public:
        uint64_t extraBuffSize = 0;
        uint64_t sigOffset = 0;
        uint64_t c = 0;
-       uchar* tableSig = new uchar[8]{
-           '\0',
-           static_cast<uchar>('\xFF'),
-           static_cast<uchar>('\xFF'),
-           '\0',
-           '\0',
-           static_cast<uchar>('\xFF'),
-           static_cast<uchar>('\xFF'),
-           '\0'
-           };
-       uchar* entrySig = new uchar[6]{
-           'E',
-           static_cast<uchar>('\xFF'),
-           'N',
-           static_cast<uchar>('\xFF'),
-           'T',
-           static_cast<uchar>('\xFF')
-           };
        
        while(true)
        {
            if(c+8 < m_currDB->DBSize-allowedWriteOffset)
            {
-                if( UnsignedString(&m_currDB->DBBuffer[allowedWriteOffset+c],0,8) == UnsignedString(tableSig,0,8))
+                if( UnsignedString(&m_currDB->DBBuffer[allowedWriteOffset+c],0,8) == UnsignedString(g_stoopidDBTableSig,0,8))
                 {
                     extraBuffSize = c;
                     sigOffset = c+allowedWriteOffset;
@@ -1218,7 +1192,7 @@ public:
        uint64_t newTableOffset = (allowedWriteOffset+tableLength);
        int size = 0;
        uint64_t newEntryOffset = 0;
-       uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer, allowedWriteOffset+tableLength, m_currDB->DBSize, entrySig, 6, size);
+       uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer, allowedWriteOffset+tableLength, m_currDB->DBSize, g_stoopidDBEntrySig, 6, size);
        
        std::cout << "Found " << size << " other tables" << std::endl;
        m_WriteDBToDisk();
@@ -1249,7 +1223,7 @@ public:
        
        for(int i = 0; i < 6;i++)
        {
-           m_currDB->DBBuffer[ENTWrite+i] = entrySig[i];
+           m_currDB->DBBuffer[ENTWrite+i] = g_stoopidDBEntrySig[i];
        }
        uint32_t ENTSize = static_cast<uint32_t>(extraSize)-8; 
        for(int i = 0; i < 4; i++)
@@ -1277,7 +1251,7 @@ public:
        
        for(int i = 0; i < 8;i++)
        {
-           m_currDB->DBBuffer[ENTWrite+6+4+tableNameSize+8+i] = tableSig[i];
+           m_currDB->DBBuffer[ENTWrite+6+4+tableNameSize+8+i] = g_stoopidDBTableSig[i];
        }
        
        
@@ -1301,8 +1275,6 @@ public:
        s_out.assign(UnsignedBuffer::ToSigned(m_currDB->DBBuffer,m_currDB->DBSize),m_currDB->DBSize);
        out.write(s_out.c_str(),m_currDB->DBSize);
        out.close();
-       delete[] entrySig;
-       delete[] tableSig;
        delete[] results;
        return 1;
    }
@@ -1386,18 +1358,9 @@ public:
            m_NullFill(EOT,expandSize);
            m_UpdateEntryTableOffset(expandSize);
            m_FixEntryTable(expandSize);
-           
-           uchar* rowSig = new uchar[6]{
-           'R',
-           static_cast<uchar>('\0'),
-           'O',
-           static_cast<uchar>('\0'),
-           'W',
-           static_cast<uchar>('\0')
-           };
            //uint64_t writeOffset = m_GetLastColumnEndOffset(tableName);
            uint64_t writeOffset = m_GetNewRowWriteOffset(tableName);
-           m_DirectWrite(writeOffset, 6, rowSig);
+           m_DirectWrite(writeOffset, 6, g_stoopidDBRowSig);
            m_DirectWrite(writeOffset+6,8,(uchar*)&expandSize);
            uint64_t newWriteOffset = writeOffset+6+8;
            if(!m_WriteAutoAndUpdateOffset(tableName,newWriteOffset))
@@ -3062,16 +3025,14 @@ private:
     uint64_t TableExist(std::string name)
     {
        uint64_t Offset = 0;
-       uchar* sig = new uchar[8]{'\0',static_cast<uchar>('\xFF'),static_cast<uchar>('\xFF'),'\0','\0',static_cast<uchar>('\xFF'),static_cast<uchar>('\xFF'),'\0'};
        UnsignedString uname = UnsignedString(name);
        int resultSize = 0;
        
-       uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), m_currDB->DBSize,sig,8,resultSize);
+       uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), m_currDB->DBSize,g_stoopidDBTableSig,8,resultSize);
        if(resultSize == 0)
        {
            std::cout << TERMINAL_RED << "DB Corrupted!! - No EntryTableSignature found!!" << TERMINAL_NOCOLOR << std::endl;
            delete[] results;
-           delete[] sig;
            return 0;
        }
        uint64_t end = results[0];
@@ -3083,7 +3044,6 @@ private:
        {
            delete[] results;
            delete[] result;
-           delete[] sig;
            return 0;
        }
        
@@ -3097,7 +3057,6 @@ private:
        
        delete[] results;
        delete[] result;
-       delete[] sig;
        return Offset;
        
        
