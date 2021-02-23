@@ -12,7 +12,7 @@ typedef unsigned char u_int8_t;
 #endif
 #pragma once
 #include <iostream>
-#include iomanip>
+#include <iomanip>
 #include <fstream>
 #include <stdio.h>
 #include <string.h>
