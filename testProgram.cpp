@@ -60,11 +60,75 @@ int main()
         }
     }
     int resultSize = 0;
+    std::cout << "Printing table: Users" << std::endl; 
     DBRow* result = dbMan->GetAllRowsFromTable("Users",resultSize);
     RowPrinter(result,resultSize);
     delete[] result;
     result = dbMan->GetAllRowsFromTable("Posts",resultSize);
+    std::cout << "Printing table: Titles" << std::endl; 
     RowPrinter(result,resultSize);
     delete[] result;
+    Key conditions[1] = {Key("id","0")};
+    uint64_t bit64ResultSize = 0;
+    result = dbMan->GetRowsWhere("Posts",conditions,1,bit64ResultSize);
+    std::cout << "Printing result of 'GetRowsWhere Condition: ID=0'" << std::endl;
+    RowPrinter(result,bit64ResultSize);
+    delete[] result;
+    dbMan->DeleteTable("Users");
+#ifndef NO_SQL
+    if(dbMan->SQlQuery("CREATE TABLE Hats(ID int(8) NOT NULL, Size int(8) NOT NULL, PRIMARY KEY (ID)); SELECT ( Title, id ) FROM Posts;",1).code != SQLResponseCode::SQL_OK)
+    {
+        std::cout << TERMINAL_RED << "Error - as expected" << std::endl;
+        std::cout << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
+    }
+    else
+    {
+        std::cout << "Printing output of 'SELECT ( Title, id ) FROM Posts;'" << std::endl;
+        RowPrinter(dbMan->SqlReturn,dbMan->SqlReturnLength);
+        DBRow row = DBRow();
+        row.InsertData("Size","12");
+        std::cout << TERMINAL_GREEN << "No error returned by SQL handler - Testing Database against expected outputs..." << TERMINAL_NOCOLOR<< std::endl;
+        std::cout << TERMINAL_CYAN << "Inserting test row containg: Column: (Size) = " << row.Find("Size").value << std::endl;
+        if(dbMan->InsertRow("Hats",row))
+        {
+            std::cout << "Row inserted - Reading row back..." << std::endl;
+            int rowsSize = 0;
+            DBRow* rows = dbMan->GetAllRowsFromTable("Hats",rowsSize);
+            if(rowsSize > 0)
+            {  
+                for(int u = 0; u < rows[0].keys.size(); u++)
+                {
+                    if(rows[0].keys.at(u).name == "Size")
+                    {
+                        std::cout << "ColumnName: " << rows[0].keys.at(u).name << "; ColumnValue: " << rows[0].keys.at(u).value << " - Expected(" << row.Find("Size").value << ")" << std::endl;
+                        if(rows[0].keys.at(u).value == row.Find("Size").value)
+                        {
+                            std::cout << TERMINAL_GREEN << "Coulumn Match!" << TERMINAL_CYAN << std::endl;
+                        }
+                    }
+                    else
+                    {
+                        std::cout << "ColumnName: " << rows[0].keys.at(u).name << "; ColumnValue: " << rows[0].keys.at(u).value << std::endl;
+                    }
+                }
+            }
+            else
+            {
+                
+                std::cout << TERMINAL_RED << "[FATAL] Database did not return the inserted row.." << TERMINAL_NOCOLOR << std::endl;
+                delete dbMan;
+                return 1;
+            }
+            
+        }
+        else
+        {
+            std::cout << TERMINAL_RED << "[FATAL] Row insertion failed with error: " << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
+            delete dbMan;
+            return 1;
+        }
+    }
+#endif
+    
     delete dbMan;
 }

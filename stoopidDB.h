@@ -1,6 +1,15 @@
 /*
  StoopidDB format Created and owned by AnzoDK (Anton F. Rosenørn-Dohn) 2021
+ 
+ IMPORTANT INFO FROM AnzoDK - There are two types of functions in this file: GET and SCAN.
+ SCAN are meant to be check the whole buffer for the information required and GET are meant to ask the entry table (if applicable).
+ If modifications to this file is made and/or new functions are created, it would be wise to keep this concept in mind to not confuse older users.
+ 
  */
+#if defined (WIN32) || defined(WIN64)
+typedef unsigned int uint;
+typedef unsigned char u_int8_t; 
+#endif
 #pragma once
 #include <iostream>
 #include <iomanip>
@@ -10,6 +19,7 @@
 #include <streambuf>
 #include <vector>
 #include <unistd.h>
+#include <algorithm>
 
 #ifndef USE_KEYMAN //Check if we should use keyman.h or use the internal struct - Use the internal struct if in doubt
 struct Key
@@ -20,6 +30,14 @@ struct Key
     {
         this->name = name;
         this->value = value;
+    }
+    /*
+     * ONLY MEANT FOR ARRAY CREATION VIA THE NEW KEYWORD
+     */
+    Key()
+    {
+        name = "";
+        value = "";
     }
     bool operator==(const Key &k)
     {
@@ -83,9 +101,69 @@ uchar g_stoopidDBRowSig[6] = {
 
 
 /*
+ * ChangeLog: Win32 support added, and a lot of places have changed to uint64_t instead of size_t to prevent 32/64 mismatch and uint64_t is used in many places where it would be ideal to keep the data 64 bits
+ * 
  ChangeLog: Added copyconstructor for UnsignedBuffer - that for some reason accepted using a const UnsignedBuffer& as an argument, due to it having a overloaded operator= that gave it the power to create new UnsignedBuffers from others, without uisng the a copyconstructor. That problem seems to have been solved!!!
  
  */
+
+std::vector<std::string> CppSplit(std::string str, char seperator) //I hate vectors for the simple reason that I like C-arrays - But I guess it makes sense here
+//
+{
+   if(str.at(0) == seperator)
+   {
+       str.erase(0,1);
+   }
+   uint64_t last = 0;
+   std::vector<std::string> arr = std::vector<std::string>();
+   for(uint64_t i = 0; i < str.length();i++)
+   {
+     if(str.at(i) == seperator)
+     {
+         arr.push_back(str.substr(last,i-last));
+         last = i+1;
+     }
+     if(i == str.length()-1)
+     {
+         arr.push_back(str.substr(last,i-last+1));
+     }
+   }
+   return arr;
+}
+
+char** CSplit(const char* str, uint64_t strLen, char seperator, uint64_t &resultSize)
+{
+    uint64_t count = 0;
+    for(uint64_t i = 0; i < strLen;i++)
+    {
+        if(str[i] == seperator)
+        {
+         count++;
+        }
+    }
+    char** arr = new char*[count];
+    uint64_t old = 0;
+    for(uint64_t i = 0; i < strLen;i++)
+    {
+        if(str[i] == seperator)
+        {
+         arr[i] = new char[i-old];
+         for(uint64_t u = 0; u < i-old;u++)
+         {
+             arr[i][u] = str[u];
+         }
+         old = i;
+        }
+    }
+    resultSize = count;
+    return arr;
+}
+
+void StrToLower(std::string &str)
+{
+    std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+}
+
 
 enum ColumnSettings
 {
@@ -132,7 +210,7 @@ public:
          m_ucBuffer = nullptr;
          length = 0;
     }
-    explicit UnsignedBuffer(size_t size)
+    explicit UnsignedBuffer(uint64_t size)
     {
         m_ucBuffer = new unsigned char[size];
         length = size;
@@ -147,12 +225,12 @@ public:
             m_ucBuffer[i] = static_cast<unsigned char>(s_buffer[i]);
         }
     }
-    UnsignedBuffer(const char* s_buffer, int _length)
+    UnsignedBuffer(const char* s_buffer, uint64_t _length)
     {
         m_ucBuffer = new unsigned char[_length];
         
         length = _length;
-        for(uint i = 0; i < length;i++)
+        for(uint64_t i = 0; i < length;i++)
         {
             m_ucBuffer[i] = static_cast<unsigned char>(s_buffer[i]);
         }
@@ -166,11 +244,11 @@ public:
           m_ucBuffer[i] = usBuff.m_ucBuffer[i];
       }
     }
-    UnsignedBuffer(uchar* buffer, size_t _length)
+    UnsignedBuffer(uchar* buffer, uint64_t _length)
     {
         length = _length;
         m_ucBuffer = new uchar[length];
-        for(size_t i = 0; i < length;i++)
+        for(uint64_t i = 0; i < length;i++)
         {
             m_ucBuffer[i] = static_cast<unsigned char>(buffer[i]);
         }
@@ -211,9 +289,9 @@ public:
         }
         return tmp_buffer;
     }
-    void InsertAt(UnsignedBuffer buffer, size_t where)
+    void InsertAt(UnsignedBuffer buffer, uint64_t where)
     {
-        for(size_t i = 0; i < buffer.length;i++)
+        for(uint64_t i = 0; i < buffer.length;i++)
         {
             m_ucBuffer[where+i] = buffer.GetBuffer()[i];
             if(where+i >= length-1)
@@ -256,7 +334,7 @@ public:
     }
     bool operator==(const UnsignedBuffer &ubuff)
     {
-        size_t c = 0;
+        uint64_t c = 0;
         bool equal = 1;
         if(length != ubuff.length)
         {
@@ -295,7 +373,7 @@ public:
     static uchar* UcharFromString(std::string str)
     {
         uchar* buff = new uchar[str.length()];
-        for(size_t i = 0; i < str.length();i++)
+        for(uint64_t i = 0; i < str.length();i++)
         {
             buff[i] = static_cast<uchar>(str.at(i));
         }
@@ -310,7 +388,7 @@ public:
         }
     }
 
-    size_t length;
+    uint64_t length;
 protected:
     unsigned char* m_ucBuffer;
 };
@@ -321,13 +399,13 @@ public:
     
     int length()
     {
-        size_t len = strBuffer.length;
+        uint64_t len = strBuffer.length;
         return len;
     }
     std::string ToSigned()
     {
         std::string tmp = "";
-        for(size_t i = 0; i < strBuffer.length;i++)
+        for(uint64_t i = 0; i < strBuffer.length;i++)
         {
             tmp += *strBuffer.at(i);
         }
@@ -342,10 +420,10 @@ public:
         strBuffer = UnsignedBuffer(1);
         strBuffer.GetBuffer()[0] = c;
     }
-    UnsignedString(const uchar buff[], size_t size)
+    UnsignedString(const uchar buff[], uint64_t size)
     {
         strBuffer = UnsignedBuffer(size);
-        for(size_t i = 0; i < size; i++)
+        for(uint64_t i = 0; i < size; i++)
         {
             *strBuffer.at(i) = buff[i];
         }
@@ -509,7 +587,7 @@ public:
         }
         return unequal;
     }
-    static size_t* Search(uchar* buffer, size_t offset, size_t length, uchar* searchTerm, size_t searchTermLength, int &resultSize)
+    static uint64_t* Search(uchar* buffer, uint64_t offset, uint64_t length, uchar* searchTerm, uint64_t searchTermLength, int &resultSize)
     {
         UnsignedBuffer* buff1 = new UnsignedBuffer(searchTerm,searchTermLength);
         int c = 0;
@@ -532,7 +610,7 @@ public:
             delete buff2;
             
         }
-        size_t* indexes = new size_t[resultSize];
+        uint64_t* indexes = new uint64_t[resultSize];
         c = 0;
         int cc = 0;
         while(true)
@@ -554,7 +632,7 @@ public:
         delete buff1;
         return indexes;
     }
-    static size_t* Search(uchar* buffer, size_t offset, size_t length, UnsignedString searchTerm, int &resultSize)
+    static uint64_t* Search(uchar* buffer, uint64_t offset, uint64_t length, UnsignedString searchTerm, int &resultSize)
     {
         int c = 0;
         resultSize = 0;
@@ -579,7 +657,7 @@ public:
         {
           return nullptr;  
         }
-        size_t* indexes = new size_t[resultSize];
+        uint64_t* indexes = new uint64_t[resultSize];
         
         c = 0;
         int cc = 0;
@@ -603,7 +681,7 @@ public:
         delete buff1;
         return indexes;
     }
-    static size_t* SearchFromEnd(uchar* buffer, size_t offset, uchar* searchTerm, size_t searchTermLength, int &resultSize)
+    static uint64_t* SearchFromEnd(uchar* buffer, uint64_t offset, uchar* searchTerm, uint64_t searchTermLength, int &resultSize)
     {
         int c = 0;
         resultSize = 0;
@@ -619,7 +697,7 @@ public:
             }
             c++;
         }
-        size_t* indexes = new size_t[resultSize];
+        uint64_t* indexes = new uint64_t[resultSize];
         c = 0;
         int cc = 0;
         while(true)
@@ -638,7 +716,7 @@ public:
         }
         return indexes;
     }
-    static size_t* SearchFromEnd(uchar* buffer, size_t offset, UnsignedString searchTerm, int &resultSize)
+    static uint64_t* SearchFromEnd(uchar* buffer, uint64_t offset, UnsignedString searchTerm, int &resultSize)
     {
         int c = 0;
         resultSize = 0;
@@ -654,7 +732,7 @@ public:
             }
             c++;
         }
-        size_t* indexes = new size_t[resultSize];
+        uint64_t* indexes = new uint64_t[resultSize];
         c = 0;
         int cc = 0;
         while(true)
@@ -727,6 +805,10 @@ struct DBRow
       Key nKey = Key(field,data);
       keys.push_back(nKey);
   }
+  void InsertData(Key k)
+  {
+      keys.push_back(k);
+  }
   void InsertData(UnsignedString field, UnsignedString data)
   {
       std::string sF = "";
@@ -739,12 +821,48 @@ struct DBRow
   
 };
 
+#ifndef NO_SQL
+enum SQLResponseCode
+{
+  SQL_OK = 0b00000000,
+  SQL_SYNTAX_ERROR = 0b10000000,
+  SQL_NO_TABLE = 0b01000000,
+  SQL_NO_COLUMN = 0b11000000,
+  SQL_SCRIPT_ERROR = 0b00100000,
+  SQL_NOT_IMPLEMENTED = 0b00010000
+};
+
+enum SQLCommand
+{
+  SELECT,
+  UPDATE,
+  DELETE,
+  INSERT_INTO,
+  CREATE,
+  ALTER
+};
+
+enum SQLEntity
+{
+    TABLE,
+    INDEX,
+    DATABASE
+};
+
+struct SQLResponse
+{
+    SQLResponseCode code = SQL_OK;
+    DBRow* returnedRows = 0x0;
+    uint64_t returnedRowsSize = 0;
+};
+#endif
+
 struct DataBase
 {
 
    std::string path;
    std::string versionString;
-   unsigned int DBSize;
+   uint64_t DBSize;
    u_int8_t* DBBuffer = nullptr; 
    bool valid = true;
    std::string Err()
@@ -1021,10 +1139,13 @@ public:
        }
        std::cout << "Resizing DB from " << m_currDB->DBSize << " to " << combinedSize+m_currDB->DBSize << std::endl;
        ResizeDB(combinedSize+m_currDB->DBSize);
-       for(size_t u = 0; u < m_currDB->DBSize-allowedWriteOffset-combinedSize;u++)
+       
+       //Relocate old data - Must be done backwards to avoid data overwriting itself when tables are smaller than the entry table XD
+       for(uint64_t u = 0; u < m_currDB->DBSize-allowedWriteOffset-combinedSize;u++)
        {
-          m_currDB->DBBuffer[allowedWriteOffset+combinedSize+u] = m_currDB->DBBuffer[allowedWriteOffset+u];
+          m_currDB->DBBuffer[m_currDB->DBSize-1-u] = m_currDB->DBBuffer[allowedWriteOffset+(m_currDB->DBSize-allowedWriteOffset-combinedSize-1)-u];
        }
+       m_NullFill(allowedWriteOffset,combinedSize);
        for(int i = 0; i < columnCount; i++)
        {
            UnsignedString uNameString = UnsignedString(columns[i].name);
@@ -1097,9 +1218,10 @@ public:
        uint64_t newTableOffset = (allowedWriteOffset+tableLength);
        int size = 0;
        uint64_t newEntryOffset = 0;
-       size_t* results = UnsignedString::Search(m_currDB->DBBuffer, allowedWriteOffset+tableLength, m_currDB->DBSize, entrySig, 6, size);
+       uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer, allowedWriteOffset+tableLength, m_currDB->DBSize, entrySig, 6, size);
        
        std::cout << "Found " << size << " other tables" << std::endl;
+       m_WriteDBToDisk();
        uint64_t ENTWrite = 0;
        if(size > 0)
        {
@@ -1199,6 +1321,42 @@ public:
             return dbRows;
        }
    }
+   /*
+    * Key* Conditions format: An array of conditions in the form of a key with a name and a value, where the name is the columnName and the value is the value of the column
+    */
+   DBRow* GetRowsWhere(std::string tableName, Key* conditions, size_t conditionsSize, uint64_t &resultSize)
+   {    
+       uint64_t exist = TableExist(tableName);
+       if(!exist)
+       {
+           resultSize = 0;
+           return notable;
+       }
+        std::vector<DBRow> rows = std::vector<DBRow>();
+        DBRow* dbRows = m_GetAllRows(tableName);
+        uint64_t _resultSize = m_GetRowCount(tableName);
+        for(int i = 0; i < _resultSize; i++)
+        {
+            uint64_t match = 0;
+            for(size_t u = 0; u < conditionsSize; u++)
+            {
+                Key tmpKey = dbRows[i].Find(conditions[u].name);
+                if(tmpKey != *nokey)
+                {
+                    if(tmpKey.value == conditions[u].value)
+                    {
+                        match++;
+                    }
+                }
+            }
+            if(match == conditionsSize)
+            {
+                rows.push_back(dbRows[i]);
+            }
+        }
+        return m_ArrayFromVector(rows,resultSize);
+       
+   }
    
    bool InsertRow(std::string tableName, DBRow row)
    {
@@ -1221,18 +1379,10 @@ public:
            expandSize+= row.keys.size()*4; //reserve space for columnID
            expandSize+=2; //this is needed - have yet to know why
            expandSize += m_CalculateSpaceForUnassignedColumns(tableName,row.keys);
-           uint64_t newEOT = EOT+expandSize;
-           uchar* tmp_buffer = new uchar[m_currDB->DBSize-EOT];
-           uint64_t tmp_buffer_size = m_currDB->DBSize-EOT;
-           for(uint64_t i = 0; i < m_currDB->DBSize-EOT;i++)
-           {
-               tmp_buffer[i] = m_currDB->DBBuffer[EOT+i];
-           }
-           
+           uint64_t newEOT = EOT+expandSize;  
            m_RewriteEOT(tableName,newEOT);
            ResizeDB(expandSize+m_currDB->DBSize,1);
-           m_DirectWrite(newEOT,tmp_buffer_size,tmp_buffer);
-           delete[] tmp_buffer;
+           m_PushData(EOT,expandSize);
            m_NullFill(EOT,expandSize);
            m_UpdateEntryTableOffset(expandSize);
            m_FixEntryTable(expandSize);
@@ -1262,7 +1412,7 @@ public:
                {
                     m_DirectWrite(newWriteOffset,4,(uchar*)&id);
                     newWriteOffset+=4;
-                    size_t value = 0;
+                    uint64_t value = 0;
                     DataType type = DataType(m_GetColumnType(tableName,row.keys.at(i).name));
                     switch(type)
                     {
@@ -1275,7 +1425,7 @@ public:
                           else if(m_GetColumnDataMaxSize(tableName,row.keys.at(i).name) <= 8 && m_GetColumnDataMaxSize(tableName,row.keys.at(i).name) > 4)
                           {
                               
-                              for(size_t u = 0; u < row.keys.at(i).value.length();u++)
+                              for(uint64_t u = 0; u < row.keys.at(i).value.length();u++)
                               {
                                   char c = row.keys.at(i).value.at(row.keys.at(i).value.length()-1-u);
                                   std::string tmp = "";
@@ -1350,8 +1500,8 @@ public:
    bool ModifyRow(std::string tableName, Key where, Key data)
    {
        DBRow* rows = m_GetAllRows(tableName);
-       size_t rowCount = m_GetRowCount(tableName);
-       for(size_t i = 0; i < rowCount; i++)
+       uint64_t rowCount = m_GetRowCount(tableName);
+       for(uint64_t i = 0; i < rowCount; i++)
        {
            Key tmpK = rows[i].Find(where);
            if(tmpK != *nokey)
@@ -1390,11 +1540,47 @@ public:
        return false;
    }
    
-   bool DeleteRow(std::string tableName, Key where)
+   bool DeleteTable(std::string tableName) //I mean who needs tables anyway XD
+   {
+       //Get the offset and end of the table
+       uint64_t startOffset = TableExist(tableName);
+       
+       if(startOffset != 0)
+       {
+            uint64_t endOffset = m_GetEOT(tableName);
+            //Sanity test
+            if(endOffset <= startOffset)
+            {
+                m_AddError("Offsets are completly lost - Try a table rebuild");
+                return 0;
+            }
+            uint64_t size = endOffset-startOffset;
+            //Repair all other table EOT's before pulling the data - This fixes wrong EOT reads when a table is deleted, and an EOT is read from a table that used to be further down in the data
+            m_ModifyEOT(-1,-size); //-1 means all tables - this will also effect the table we're currently deleting, but as we are deleting it, it doesn't matter
+            m_PullData(startOffset,size);
+            m_NullFill(m_currDB->DBSize-size-1,size); //Not necessary, but makes it easier to see the changes if the DB file is inspected in a hex-editor
+            m_WriteDBToDisk(); //DEBUG
+            //Resize should clear space for both the old entry and table
+            //ResizeDB(m_currDB->DBSize-size-(tableName.length()+1+8),1); //+1 for NULL terminator and + 8 for OFFSET
+            ResizeDB(m_currDB->DBSize-size);
+            m_FixEntryTable(-size);
+       }
+       else
+       {
+           m_AddError("Could not find table");
+           return 0;
+       }
+       m_WriteDBToDisk();
+       return 1;
+       
+       
+   }
+   
+   bool DeleteRow(std::string tableName, Key where) //TODO Add support for multiple conditions //Lol ofc XDXDXDXD
    {
        DBRow* rows = m_GetAllRows(tableName);
-       size_t rowCount = m_GetRowCount(tableName);
-       for(size_t i = 0; i < rowCount; i++)
+       uint64_t rowCount = m_GetRowCount(tableName);
+       for(uint64_t i = 0; i < rowCount; i++)
        {
            Key tmpK = rows[i].Find(where);
            if(tmpK != *nokey)
@@ -1406,7 +1592,7 @@ public:
                  return 0;
                }
                uint64_t length = m_GetRowLength(offset);
-               for(size_t i = 0; i < length;i++)
+               for(uint64_t i = 0; i < m_currDB->DBSize-offset;i++)
                {
                    m_currDB->DBBuffer[offset+i] = m_currDB->DBBuffer[offset+length+i];
                }
@@ -1417,7 +1603,481 @@ public:
        }
        return false;
    }
-   
+   #ifndef NO_SQL
+   SQLResponse SQlQuery(std::string sqlQ,bool verbose=false)
+   {
+       SQLResponse response = SQLResponse();
+       if(SqlReturn != nullptr)
+       {
+            delete[] SqlReturn;
+            SqlReturnLength = 0;
+            SqlReturn = nullptr;
+       }
+       SqlReturnLength = 0;
+       if(verbose)
+       {
+           std::cout << TERMINAL_CYAN << '"' << "PlsNoSQL v1 C++ edition" << '"' << " will be used for SQL Processing." << std::endl << "The keywords and syntax may differ a bit from usual SQL." << std::endl << "Please refer to the documentation for help." << TERMINAL_NOCOLOR << std::endl;
+       }
+       size_t pos = sqlQ.find("'", 0);
+       std::vector<size_t> indexes = std::vector<size_t>();
+       while(pos != std::string::npos)
+       {
+            indexes.push_back(pos);
+            pos = sqlQ.find("'",pos+1);
+       }
+       if(indexes.size() % 2 != 0)
+       {
+           std::string s = TERMINAL_YELLOW;
+           s += "[Fatal] {SQL Code Processing} Un-even amount of (') symbols - Note that ";
+           s += '"';
+           s += " is not supported";
+           s += TERMINAL_NOCOLOR;
+           m_AddError(s);
+           response.code = SQLResponseCode::SQL_SYNTAX_ERROR;
+       }
+       pos = sqlQ.find(";", 0);
+       indexes.clear();
+       while(pos != std::string::npos)
+       {
+            indexes.push_back(pos);
+            pos = sqlQ.find(";",pos+1);
+       }
+       if(indexes.size() == 0)
+       {
+           response.code = SQL_SYNTAX_ERROR;
+           m_AddError("[Fatal] {SQL Code Processing} Missing ';'");
+           return response;
+       }
+       if(verbose)
+       {
+         std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} " << indexes.size() << " Line(s) detected" << TERMINAL_NOCOLOR << std::endl;
+         std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Starting Keyword Detection..." << TERMINAL_NOCOLOR << std::endl;
+       }
+       //Keyword detection
+       std::vector<std::string> lines = std::vector<std::string>();
+       size_t prevIndex = 0;
+       for(size_t i = 0; i < indexes.size();i++)
+       {
+           lines.push_back(sqlQ.substr(prevIndex,indexes.at(i)+1));
+           prevIndex = indexes.at(i)+1;
+       }
+       indexes.clear();
+       std::vector<SQLCommand> CommandKeys = std::vector<SQLCommand>();
+       std::vector<SQLEntity> AffectedEntities = std::vector<SQLEntity>();
+       std::vector<std::string> Names = std::vector<std::string>();
+       size_t FROM = 0;
+       for(size_t i = 0; i < lines.size();i++)
+       {
+           std::vector<std::string> words = CppSplit(lines.at(i),' ');
+           std::transform(words.at(0).begin(), words.at(0).end(), words.at(0).begin(), ::tolower);
+           if(words.at(0) == "select")
+           {
+               CommandKeys.push_back(SQLCommand::SELECT);
+               std::string* columnNames = nullptr;
+               uint64_t columnNamesSize = 0;
+               int columnNameEndWord = -1;
+               for(size_t u = 0; u < words.size();u++)
+               {
+                   if(words.at(u).find(")") != std::string::npos)
+                   {
+                       columnNameEndWord = u;
+                       break;
+                   }
+                   if(words.at(u).find("FROM") != std::string::npos) //For future me - check for lower case "FROM" as well
+                   {
+                     FROM = u;  
+                     break;
+                   }
+               }
+               if(columnNameEndWord == -1)
+               {
+                   columnNames = new std::string[1];
+                   columnNames[0] = words.at(1);
+                   columnNamesSize = 1;
+               }
+               else
+               {
+                   std::string tmpColumnNameString = "";
+                   for(size_t u = 1; u < columnNameEndWord+1;u++)
+                   {
+                       tmpColumnNameString += words.at(u);
+                   }
+                   //Prevent empty parathesis
+                   if(tmpColumnNameString == "" || tmpColumnNameString == "()")
+                   {
+                       response.code = SQL_SYNTAX_ERROR;
+                       m_AddError("No column names specified");
+                       return response;
+                   }
+                   if(verbose)
+                   {
+                       std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Combined words from input - Assuming string: "<< '"' << tmpColumnNameString << '"' << " Contains the columnNames" << TERMINAL_NOCOLOR << std::endl;
+                   }
+                   int tmpPos = 0;
+                   /* //This has already been done by the CppSplit function - Keeping it in case it might be needed due to some weird bug or something
+                   while(tmpColumnNameString.find(" ",tmpPos) != std::string::npos)
+                   {
+                       int tmpIndex = tmpColumnNameString.find(" ",tmpPos);
+                       tmpColumnNameString.erase(tmpIndex,1);
+                       tmpPos = tmpIndex+1;
+                   }*/
+                   tmpColumnNameString.erase(0,1); //Delete the '('
+                   tmpColumnNameString.erase(tmpColumnNameString.length()-1,1); //Delete the ')'
+                   tmpPos = 0;
+                   std::vector<std::string> columnNamesVec = std::vector<std::string>();
+                   while(tmpColumnNameString.find(",",tmpPos) != std::string::npos)
+                   {
+                       int tmpIndex = tmpColumnNameString.find(",",tmpPos);
+                       columnNamesVec.push_back(tmpColumnNameString.substr(tmpPos,tmpIndex-tmpPos));
+                       tmpPos = tmpIndex+1;
+                   }
+                   columnNamesVec.push_back(tmpColumnNameString.substr(tmpPos));
+                   if(verbose)
+                   {
+                       std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Assuming columns to be: {" << std::endl;
+                       for(size_t u = 0; u < columnNamesVec.size();u++)
+                       {
+                           std::cout << columnNamesVec.at(u) << std::endl;
+                       }
+                       std::cout << "}" << TERMINAL_NOCOLOR << std::endl;
+                   }
+                   columnNames = m_ArrayFromVector(columnNamesVec,columnNamesSize);
+                   //TODO Return rows and check for "WHERE" - but first Imma create a function to get specific rows from the database - DONE (Now it's time to create the SQL handle for SELECT)
+                   
+                   
+               }
+               if(FROM == 0)
+               {
+                   for(size_t z = columnNameEndWord; z < words.size();z++)
+                   {
+                     if(words.at(z) == "FROM")//TODO check for lowercase as well
+                     {
+                         FROM = z;
+                         break;
+                     }
+                   }
+                   if(FROM == 0)
+                     {
+                         response.code = SQL_SYNTAX_ERROR;
+                         m_AddError("No 'FROM' keyword found");
+                         return response;
+                     }
+               }
+               
+               std::string tableName = "";
+               try
+               {
+                   tableName = words.at(FROM+1);
+               }
+               catch(std::out_of_range)
+               {
+                   m_AddError("No table name specified");
+                   response.code = SQL_SYNTAX_ERROR;
+                   return response;
+               }
+               if(columnNamesSize == 1 && columnNames[0] == "*")
+               {
+                   SqlReturn = m_GetAllRows(tableName);
+                   SqlReturnLength = m_GetRowCount(tableName);
+                   response.code = SQL_OK;
+                   return response;
+               }
+               if(tableName.at(tableName.size()-1) == ';')
+               {
+                   tableName.erase(tableName.size()-1,1);
+               }
+               bool usingWhere = 1;
+               try
+               {
+                  std::string strWHERE = words.at(FROM+2);
+               }
+               catch(std::out_of_range)
+               {
+                 usingWhere = 0;  
+               }
+               if(usingWhere)
+               {
+                   //TODO handle WHERE
+                   response.code = SQL_NOT_IMPLEMENTED;
+               }
+               else
+               {
+                   std::vector<DBRow> tmpRows = std::vector<DBRow>();
+                   int tmpresultSize = 0;
+                   DBRow* _rows = GetAllRowsFromTable(tableName,tmpresultSize);
+                   if(_rows != notable && _rows != norow)
+                   {
+                   for(int z = 0; z < tmpresultSize;z++)
+                   {
+                       DBRow r = DBRow();
+                       for(int a = 0; a < columnNamesSize; a++)
+                       {
+                        r.InsertData(_rows[z].Find(columnNames[a]));
+                       }
+                       tmpRows.push_back(r);
+                   }
+                   delete[] _rows;
+                   SqlReturn = m_ArrayFromVector(tmpRows,SqlReturnLength);
+                   response.code = SQL_OK;
+                   return response;
+                   }
+                   else
+                   {
+                       std::string err = "Could not find table: " + tableName;
+                       m_AddError(err);
+                       response.code = SQL_NO_TABLE;
+                       return response;
+                   }
+               }
+               
+           }
+           else if(words.at(0) == "update")
+           {
+               CommandKeys.push_back(SQLCommand::UPDATE);
+           }
+           else if(words.at(0) == "alter")
+           {
+               CommandKeys.push_back(SQLCommand::ALTER);
+           }
+           else if(words.at(0) == "create")
+           {
+               StrToLower(words.at(1));
+               CommandKeys.push_back(SQLCommand::CREATE);
+               if(words.at(1) == "table")
+               {
+                   AffectedEntities.push_back(SQLEntity::TABLE);
+                   std::string tableName = "";
+                   if(words.at(2).find("(") != std::string::npos)
+                   {
+                       //Is the "(" the last character?
+                       if(words.at(2).find("(") == words.at(2).length()-1)
+                       {
+                        words.insert(words.begin()+3,"(");
+                        words.at(2) = words.at(2).substr(0,words.at(2).find("("));
+                        
+                       }
+                       else
+                       {
+                           size_t pos = words.at(2).find("(");
+                           words.insert(words.begin()+3,"(");
+                           words.insert(words.begin()+4,words.at(2).substr(pos+1,(words.at(2).length()-1)-pos));
+                           words.at(2) = words.at(2).substr(0,words.at(2).find("("));
+                       }
+                       
+                   }
+                   tableName = words.at(2);
+                   if(verbose)
+                   {
+                     std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Guessing action to be: create a new table with name: " << tableName << std::endl << "[Info] {SQL Code Processing} Starting Column Detection..." << TERMINAL_NOCOLOR << std::endl;  
+                     
+                   }
+                   std::string columns = "";
+                   for(int u = 3; u < words.size();u++)
+                   {
+                       columns+=(words.at(u)+" ");
+                   }
+                   if(verbose)
+                   {
+                     std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Looking for column clues in: " << columns << TERMINAL_NOCOLOR << std::endl;
+                   }
+                   int c_pos = columns.find(",");
+                   int count = 0;
+                   if(c_pos != std::string::npos)
+                   {
+                        count++;
+                        c_pos++;
+                   }
+                   while(columns.find(",",c_pos) != std::string::npos)
+                   {
+                       count++;
+                       c_pos = columns.find(",",c_pos)+1;
+                   }
+                   c_pos = 0;
+                   std::vector<DBColumn> dbColumns = std::vector<DBColumn>();
+                   std::vector<DataType> columnTypes = std::vector<DataType>();
+                   for(int c = 0; c < count+1;c++)
+                   {
+                      DBColumn tmpColumn = DBColumn();
+                      int start = 0;
+                      if(c == 0)
+                      {
+                          start = columns.find("(")+1;
+                          if(columns.at(start) == ' ')
+                          {
+                              start++;
+                          }
+                      }
+                      else
+                      {
+                          start = c_pos;
+                      }
+                      int end = columns.find(" ",start);
+                      
+                      std::string tmpName = columns.substr(start,end-start);
+                      if(tmpName.find("PRIMARY") != std::string::npos)
+                      {
+                          std::string tmpPrim = columns.substr(columns.find("(",start)+1,columns.find(")",start)-(columns.find("(",start)+1));
+                          bool found = 0;
+                          for(int z = 0; z < dbColumns.size();z++)
+                          {
+                             if(dbColumns.at(z).name == tmpPrim)
+                             {
+                                 if(verbose)
+                                 {
+                                   std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Setting PRIMARY KEY to column: " << tmpPrim << TERMINAL_NOCOLOR << std::endl;  
+                                 }
+                                 dbColumns.at(z).settingsByte = (dbColumns.at(z).settingsByte | ColumnSettings::PRIMARY_KEY);
+                             }
+                             found = 1;
+                             break;
+                          }
+                          if(!found)
+                          {
+                              response.code = SQL_SYNTAX_ERROR;
+                              return response;
+                          }
+                          c_pos = columns.find(")",start)+1;
+                          continue;
+                      }
+                      tmpColumn.name = tmpName;
+                      start = end+1;
+                      end = columns.find(",",start);
+                      std::string tmpTypeString = columns.substr(start,end-start);
+                      if(tmpTypeString.find(")")+1 != tmpTypeString.length())
+                      {
+                          int index = tmpTypeString.find(")");
+                          std::string cmpString = "";
+                          for(int j = 0; j < tmpTypeString.length()-index;j++)
+                          {
+                            cmpString+=" ";
+                          }
+                          std::string settingsStr = tmpTypeString.substr(index+1,tmpTypeString.length()-index);
+                          if(settingsStr != cmpString)
+                          {
+                              if(verbose)
+                              {
+                                std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Possible Settings for Column: " << tmpColumn.name << TERMINAL_NOCOLOR << std::endl;
+                              }
+                              settingsStr.erase(remove_if(settingsStr.begin(), settingsStr.end(), isspace), settingsStr.end());
+                              if(settingsStr == "NOTNULL")
+                              {
+                                  tmpColumn.settingsByte = tmpColumn.settingsByte | ColumnSettings::NOT_NULL;
+                              }
+                              else
+                              {
+                                 if(verbose)
+                                {
+                                    std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Unknown or unimplemented settings for column: " << '"' << tmpColumn.name << '"' << ". Setting that caused the error: " << settingsStr << TERMINAL_NOCOLOR << std::endl;
+                                }
+                                 response.code = SQL_SYNTAX_ERROR;
+                                 return response;  
+                              }
+                          }
+                      }
+                      if(tmpTypeString.find("(") != std::string::npos)
+                      {
+                          std::string tmpTypeStringNoSize = tmpTypeString.substr(0,tmpTypeString.find("("));
+                          std::transform(tmpTypeStringNoSize.begin(), tmpTypeStringNoSize.end(), tmpTypeStringNoSize.begin(), ::tolower);
+                          if(tmpTypeStringNoSize == "int")
+                          {
+                              tmpColumn.type = DataType::INT;
+                          }
+                          else if (tmpTypeStringNoSize == "varchar")
+                          {
+                              tmpColumn.type = DataType::VARCHAR;
+                          }
+                          else
+                          {
+                            response.code = SQL_NOT_IMPLEMENTED;
+                            return response;
+                          }
+                          int tmpStart = tmpTypeString.find("(")+1;
+                          int tmpEnd = tmpTypeString.find(")");
+                          if(tmpEnd == std::string::npos)
+                          {
+                            response.code = SQL_SYNTAX_ERROR;
+                            return response;
+                          }
+                          std::string columnSize = tmpTypeString.substr(tmpStart,tmpEnd-tmpStart);
+                          tmpColumn.size = std::stoi(columnSize);
+                      }
+                      else
+                      {
+                          std::transform(tmpTypeString.begin(), tmpTypeString.end(), tmpTypeString.begin(), ::tolower);
+                          if(tmpTypeString == "int")
+                          {
+                              tmpColumn.type = DataType::INT;
+                              tmpColumn.size = 8;
+                          }
+                          else if (tmpTypeString == "varchar")
+                          {
+                              tmpColumn.type = DataType::VARCHAR;
+                              tmpColumn.size = 256;
+                          }
+                          else
+                          {
+                            response.code = SQL_NOT_IMPLEMENTED;
+                            return response;
+                          }
+                      }
+                      c_pos = end+2;
+                      dbColumns.push_back(tmpColumn);
+                      
+                   }
+                   uint64_t vectorSize = 0;
+                   DBColumn* arr = m_ArrayFromVector(dbColumns,vectorSize);
+                   CreateTable(tableName,vectorSize,arr);
+                   response.code = SQLResponseCode::SQL_OK;
+                   delete[] arr;
+                   
+                    
+               }
+               else if(words.at(1) == "index") //Indexing on columns are not easy to make T_T
+               {
+                   AffectedEntities.push_back(SQLEntity::INDEX);
+                   response.code = SQL_NOT_IMPLEMENTED;
+                   break;
+               }
+               else
+               {
+                   response.code = SQLResponseCode::SQL_SCRIPT_ERROR;
+                   if(verbose)
+                   {
+                    std::cout << "[Fatal] {SQL Code Processing} Can't understand SQL Entity: " << words.at(1) << std::endl;
+                    break;
+                   }
+               }
+               
+               
+           }
+           else if(words.at(0) == "delete")
+           {
+               CommandKeys.push_back(SQLCommand::DELETE);
+               
+           }
+           else if(words.at(0) == "insert")
+           {
+               CommandKeys.push_back(SQLCommand::INSERT_INTO);
+               
+           }
+           else
+           {
+               response.code = SQLResponseCode::SQL_SCRIPT_ERROR;
+               if(verbose)
+               {
+                   std::cout << "[Fatal] {SQL Code Processing} Can't understand SQL command: " << words.at(0) << std::endl;
+                   break;
+               }
+           }
+           
+       }
+       
+       
+       return response;
+   }
+   DBRow* SqlReturn = nullptr;
+   uint64_t SqlReturnLength = 0;
+   #endif
    
    static DBRow* notable;
    static Key* nokey;
@@ -1471,10 +2131,10 @@ private:
         {
           return 0;  
         }
-        size_t offset = m_GetLastColumnEndOffset(tableName);
-        size_t EOT = m_GetEOT(tableName);
+        uint64_t offset = m_GetLastColumnEndOffset(tableName);
+        uint64_t EOT = m_GetEOT(tableName);
         int resultSize = 0;
-        size_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,g_stoopidDBRowSig,6,resultSize);
+        uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,g_stoopidDBRowSig,6,resultSize);
         offset = results[index];
         delete[] results;
         return offset;
@@ -1512,7 +2172,7 @@ private:
      * @param Takes an offset *WITH THE SIGNATURE* and gets the length of the entry.
      * @return rowEntryLength.
      */
-    uint64_t m_GetRowLength(size_t EntryWithSig)
+    uint64_t m_GetRowLength(uint64_t EntryWithSig)
     {
         uint64_t size = 0;
         for(int i = 0; i < 8;i++)
@@ -1522,14 +2182,34 @@ private:
         return size;
     }
     
-    
+    /*
+     * 
+     * @param Takes a table index and a offsetChange and modifies the requested table EOT, based on when it appears in the data - this index can be retrived through m_GetTableIndex() - Both this and m_GetTableIndex expects the entry table to work
+     */
+    void m_ModifyEOT(int tableIndex, int64_t offsetChange)
+    {
+      if(tableIndex == -1)
+      {
+        uint32_t tableCount = m_GetTableCount();
+        uint32_t nameCount = 0;
+        std::string* names = m_GetTableNames(nameCount);
+        if(nameCount != tableCount)
+        {
+            m_AddError("[NOT FATAL] WARNING: m_GetTableCount and m_GetTableNames do not agree on the amount of tables. Be careful!");
+        }
+        for(uint32_t i = 0; i < tableCount; i++)
+        {
+            m_RewriteEOT(names[i],m_GetEOT(names[i])+offsetChange);
+        }
+      }
+    }
     uint64_t m_GetNewRowWriteOffset(std::string tableName)
     {
-        size_t rowsStart = m_GetLastColumnEndOffset(tableName);
-        size_t rowsSize = m_GetEOT(tableName)-rowsStart;
+        uint64_t rowsStart = m_GetLastColumnEndOffset(tableName);
+        uint64_t rowsSize = m_GetEOT(tableName)-rowsStart;
         int rows = 0;
-        size_t* offsets = UnsignedString::Search(m_currDB->DBBuffer,rowsStart,rowsSize,g_stoopidDBRowSig,6,rows);
-        size_t returnOffset = m_GetLastColumnEndOffset(tableName);
+        uint64_t* offsets = UnsignedString::Search(m_currDB->DBBuffer,rowsStart,rowsSize,g_stoopidDBRowSig,6,rows);
+        uint64_t returnOffset = m_GetLastColumnEndOffset(tableName);
         for(int i = 0; i < rows; i++)
         {
             returnOffset += m_GetRowLength(offsets[i]);
@@ -1541,18 +2221,28 @@ private:
     /*
      * @param Updates offsets in the entry table by reading tablenames without the help of the entrytable and checks if offsets are correct - and if not attempts to fix them - Useful after a resize operation
      */
-    void m_FixEntryTable(size_t expandSize)
+    void m_FixEntryTable(int64_t expandSize)
     {
         uint32_t offsetsSize = 0;
         uint64_t* offsets = m_GetAllEntryOffsets(offsetsSize);
-        size_t namesSize = 0;
+        uint32_t namesSize = 0;
         std::string* names = m_ScanForTableNames(namesSize);
+        bool rebuild = 0;
         if(offsetsSize < namesSize)
         {
             m_AddError("[Non-Fatal] Entry table is missing entries - Full rebuild of entry table is recommended");
+            rebuild = 1;
         }
-        for(uint32_t i = 0; i < offsetsSize;i++)
+        else if(namesSize < offsetsSize)
         {
+            m_AddError("[Non-Fatal] Entry table has entries for deleted tables - Applies workaround (full table rebuild)");
+            rebuild = 1;
+            
+        }
+        if(!rebuild)
+        {
+            for(uint32_t i = 0; i < offsetsSize;i++)
+            {
               uint64_t offset = 0;
               std::string tmp_name = m_ReadString(offsets[i]+6+4,255);
               for(int u = 0; u < 8; u++)
@@ -1566,7 +2256,7 @@ private:
                   if(m_ReadString(offset,255) != names[i])
                   {
                       std::cout << "[Non-Fatal] Entry pointer completly lost - Rebuiling entry" << std::endl;
-                      size_t size = 0;
+                      uint32_t size = 0;
                       uint64_t* sets = m_ScanForTableNameOffsets(size);
                       offset = sets[i];
                       delete[] sets;
@@ -1577,19 +2267,56 @@ private:
                 //m_currDB->DBBuffer[offsets[i]+6+4+tmp_name.length()+1+7-u] = (uchar)((uchar*)&offset)[u]; //< -- This is the method used for reading the data not writing it - as this writes in the big-endian, which makes the little endian reader fucked
                 m_currDB->DBBuffer[offsets[i]+6+4+tmp_name.length()+1+u] = (uchar)((uchar*)&offset)[u]; //<-- This is a fine little endian writer.
               }
+            }
+        }
+        else
+        {
+            //Setting rebuild by overwriting the offsets array with a full scan versionString
+            delete[] offsets;
+            offsets = m_ScanForTableNameOffsets(offsetsSize);
+            //Let's just assume that at least the first entry in the table exists.
+            int tableOffsetSize = 0;
+            uint64_t* tableOffsetArray = UnsignedString::Search(m_currDB->DBBuffer,offsets[offsetsSize-1],m_currDB->DBSize, g_stoopidDBEntrySig,6,tableOffsetSize);
+            uint64_t newTableOffset = tableOffsetArray[0];
+            delete[] tableOffsetArray;
+            m_CreateNewEntryTable(newTableOffset);
         }
         delete[] names;
         delete[] offsets;
         
+        
     }
     
+    std::string* m_GetTableNames(uint32_t &arraySize)//**NOT** A SCAN FUNCTION - So we expect the table to work
+    {
+        uint64_t* entOffsets = m_GetAllEntryOffsets(arraySize);
+        std::string* names = new std::string[arraySize];
+        for(uint32_t i = 0; i < arraySize;i++)
+        {
+            names[i] = m_GetTableNameFromEntry(entOffsets[i]);
+        }
+        return names;
+        
+        
+        
+    } 
+    
     /*
+     * @param Takes a an entry **WITH** signature and returns the name of the table from the entry
+     */
+    std::string m_GetTableNameFromEntry(uint64_t entry)
+    {
+        return m_ReadString(entry+6+4,255);
+    }
+    
+        /*
      *@param Scans for names of tables without using the entry table - Useful if you suspect the entry table to be corrupted - However it does depend on the size of the tables being recorded acurately
      *
      */
-    std::string* m_ScanForTableNames(size_t &arraySize)
+    std::string* m_ScanForTableNames(uint32_t &arraySize)
     {
-       uint32_t count = m_GetTableCount();
+       //uint32_t count = m_GetTableCount(); // AGAIN "SCAN"-FUNCTIONS SHOULD **NEVER** USE THE FUCKING ENTRYTABLE AS SCAN EXPECTS IT TO BE FUCKED!!!
+       uint32_t count = m_ScanForTableCount(); //<<-- Do this
        arraySize = count;
        uint64_t offset = 0;
        std::string* arr = new std::string[count]; 
@@ -1607,9 +2334,56 @@ private:
        return arr;
        
     }
-    uint64_t* m_ScanForTableNameOffsets(size_t &arraySize)
+    
+    void m_CreateNewEntryTable(uint64_t offset)
     {
-       uint32_t count = m_GetTableCount();
+        uint64_t currOffset = offset;
+        uint32_t namesSize = 0;
+        std::string* names = m_ScanForTableNames(namesSize);
+        std::cout << "Found names: " << std::endl << "[START]" << std::endl;
+        for(uint32_t i = 0; i < namesSize;i++)
+        {
+            std::cout << names[i] << std::endl;
+        }
+        std::cout << "[END]" << std::endl;
+        uint32_t expectedSize = 0;
+        for(uint32_t i = 0; i < namesSize; i++)
+        {
+            expectedSize+=names[i].length()+1+8+6+4; //+1 for Null terminator, +4 for entry length, +8 for offset and +6 for ENT signature
+        }
+        expectedSize+=8+8; //+8 For end signature and +8 for last 8 bytes of file
+        if(offset+expectedSize > m_currDB->DBSize)
+        {
+            ResizeDB(offset+expectedSize,1);
+        }
+        uint32_t offsetsSize = 0;
+        uint64_t* offsets = m_ScanForTableNameOffsets(offsetsSize);
+        for(uint32_t i = 0; i < offsetsSize;i++)
+        {
+            m_DirectWrite(currOffset,6,g_stoopidDBEntrySig);
+            currOffset+=6;
+            uint32_t entSize = names[i].length()+1+6+8+4;
+            m_DirectWrite(currOffset,4,(uchar*)&entSize); //+1 for nullterminator, +6 for signature, and +8 for offset
+            currOffset+=4; //+4 for entry size
+            m_DirectWriteNullFill(currOffset,names[i].length(),names[i].length()+1,names[i].c_str());
+            currOffset+=names[i].length()+1;
+            m_DirectWrite(currOffset,8,(uchar*)&offsets[i]);
+            currOffset+=8;
+        }
+        m_DirectWrite(currOffset,8,g_stoopidDBTableSig);
+        currOffset+=8;
+        ResizeDB(currOffset+8,1);
+        delete[] offsets;
+        delete[] names;
+        m_DirectWrite(m_currDB->DBSize-8,8,(uchar*)&offset);
+        m_WriteDBToDisk();
+        std::cout << "Created new table" << std::endl;
+    }
+    
+    uint64_t* m_ScanForTableNameOffsets(uint32_t &arraySize)
+    {
+       //uint32_t count = m_GetTableCount(); //Relies on m_GetEntryPointer which is not reliable in SCAN functions as SCAN functions are meant to be used when the table is fucked
+       uint32_t count = m_ScanForTableCount(); //<<-- Do this
        arraySize = count;
        uint64_t offset = 0;
        uint64_t* arr = new uint64_t[count]; 
@@ -1637,9 +2411,9 @@ private:
             return 0x0; //Error equal to nullptr
         }
         DBRow* dbRows = m_GetAllRows(tableName);
-        for(size_t i = 0; i < rows; i++)
+        for(uint32_t i = 0; i < rows; i++)
         {
-            for(size_t u = 0; i < dbRows[i].keys.size();u++)
+            for(uint64_t u = 0; i < dbRows[i].keys.size();u++)
             {
             if(dbRows[i].keys.at(u).name == primKeyName)
             {
@@ -1659,14 +2433,14 @@ private:
     
     std::string m_GetPrimaryKey(std::string tableName)
     {
-        size_t offset = m_GetColumnsStart(tableName);
-        size_t columnCount = m_GetColumnCount(tableName);
+        uint64_t offset = m_GetColumnsStart(tableName);
+        uint32_t columnCount = m_GetColumnCount(tableName);
         std::string* names = m_GetAllColumnNames(tableName);
-        for(size_t i = 0; i < columnCount; i++)
+        for(uint32_t i = 0; i < columnCount; i++)
         {
             UnsignedString tmp = m_ReadUnsignedString(offset,255,1);
-            size_t columnSize = m_ReadUnsingedValue(4, offset+tmp.length());
-            size_t nextOffset = offset+columnSize;
+            uint64_t columnSize = m_ReadUnsingedValue(4, offset+tmp.length());
+            uint64_t nextOffset = offset+columnSize;
             uchar settingsByte = m_ReadUnsingedValue(1,offset+tmp.length()+4+1);
             uchar binOpResult = settingsByte & (uchar)0b00100000;
             if(binOpResult == (uint)0b100000)
@@ -1686,32 +2460,43 @@ private:
         
     }
     
+    uint32_t m_ScanForTableCount()//ONLY USE WHEN THE TABLE IS **COMPLETlY** FUCKED AS THIS WASTES SOOOOOO MUCH PROCESSING POWER
+    {
+        uint32_t count = 0;
+        for(uint64_t i = 12; i < m_currDB->DBSize;i+=0)
+        {
+            i = m_ReadUnsingedValue(8,i+m_ReadUnsignedString(i,255).length()); //TODO Make sure that we don't find empty or made up tables
+            if(i < m_currDB->DBSize){ count++;}
+        }
+        return count;
+    }
+    
     DBRow* m_GetAllRows(std::string tableName, bool ignoreNewest=false)
     {
-        size_t rowCount = m_GetRowCount(tableName);
+        uint32_t rowCount = m_GetRowCount(tableName);
         DBRow* rows = new DBRow[rowCount];
-        size_t offset = m_GetLastColumnEndOffset(tableName);
-        size_t EOT = m_GetEOT(tableName);
+        uint64_t offset = m_GetLastColumnEndOffset(tableName);
+        uint64_t EOT = m_GetEOT(tableName);
         int resultSize = 0;
-        size_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,g_stoopidDBRowSig,6,resultSize);
-        for(size_t i = 0; i < (ignoreNewest==true ? rowCount-1 : rowCount); i++)
+        uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,g_stoopidDBRowSig,6,resultSize);
+        for(uint32_t i = 0; i < (ignoreNewest==true ? rowCount-1 : rowCount); i++)
         {
-            size_t rowOffset = 0;
-            size_t rowLength = m_GetRowLength(results[i]);
+            uint64_t rowOffset = 0;
+            uint64_t rowLength = m_GetRowLength(results[i]);
             while(true)
             {
                 std::string columnName = m_GetColumnNameFromID(tableName,m_ReadUnsingedValue(4,results[i]+6+8+rowOffset));
-                size_t columnMAX = m_GetColumnDataMaxSize(tableName,columnName);
+                uint32_t columnMAX = m_GetColumnDataMaxSize(tableName,columnName);
                 DataType type = DataType(m_GetColumnType(tableName,columnName));
                 std::string dataString = "";
                 switch(type)
                 {
                     case DataType::INT:{
                         UnsignedString uData = m_ReadUnsignedString(results[i]+6+8+4+rowOffset,columnMAX,0);
-                        size_t tmp = 0;
+                        uint32_t tmp = 0;
                         if(columnMAX <= 8)
                         {
-                        for(size_t u = 0; u < columnMAX; u++)
+                        for(uint32_t u = 0; u < columnMAX; u++)
                         {
                             
                             tmp = (tmp | uData.at(columnMAX-1-u)) << (u == columnMAX-1 ? 0 : 8);
@@ -1756,7 +2541,7 @@ private:
         return rows;
     }
     
-    std::string m_GetColumnNameFromID(std::string tableName, size_t id)
+    std::string m_GetColumnNameFromID(std::string tableName, uint32_t id)
     {
         std::string name = "";
         std::string* names = m_GetAllColumnNames(tableName);
@@ -1768,7 +2553,7 @@ private:
     
     uchar m_GetColumnSettings(std::string tableName, std::string columnName)
     {
-       size_t offset =  m_GetColumnOffset(tableName,columnName);
+       uint64_t offset =  m_GetColumnOffset(tableName,columnName);
        UnsignedString utmp = m_ReadUnsignedString(offset,255);
        uchar settings = m_ReadUnsingedValue(1,offset+utmp.length()+4+1);
        if(settings == 0)
@@ -1781,24 +2566,36 @@ private:
     }
     
     template<typename T>
-    std::vector<T> m_VectorFromArray(T* arr, size_t len)
+    std::vector<T> m_VectorFromArray(T* arr, uint64_t len)
     {
         std::vector<T> tmpVec = std::vector<T>();
-        for(size_t i = 0; i < len; i++)
+        for(uint64_t i = 0; i < len; i++)
         {
             tmpVec.push_back(arr[i]);
         }
         return tmpVec;
     }
+    template<typename T>
+    T* m_ArrayFromVector(std::vector<T> vec, uint64_t &arrSize)
+    {
+        T* arr = new T[vec.size()];
+        for(uint64_t i = 0; i < vec.size();i++)
+        {
+            arr[i] = vec.at(i);
+        }
+        arrSize = vec.size();
+        return arr;
+    }
+    
     
     uchar m_GetColumnType(std::string tableName, std::string columnName)
     {
        return m_ReadUnsingedValue(1,m_GetColumnOffset(tableName,columnName)+columnName.length()+1+4);  
     }
     
-    bool m_WriteAutoAndUpdateOffset(std::string tableName, size_t &offset)
+    bool m_WriteAutoAndUpdateOffset(std::string tableName, uint64_t &offset)
     {
-        size_t rowCount = m_GetRowCount(tableName);
+        uint32_t rowCount = m_GetRowCount(tableName);
         std::string primKey = m_GetPrimaryKey(tableName);
         if(primKey == "")
         {
@@ -1806,7 +2603,7 @@ private:
           return false;  
         }
         
-        size_t currAutoInc = 0xFFFFFFFFFFFFFFFF;
+        uint64_t currAutoInc = 0xFFFFFFFFFFFFFFFF;
         if(rowCount-1 > 0)
         {
             DBRow* rows = m_GetAllRows(tableName,1);
@@ -1839,10 +2636,10 @@ private:
         }
     }
     
-    size_t m_CalculateSpaceForUnassignedColumns(std::string tableName, std::vector<Key> assignedColumns)
+    uint64_t m_CalculateSpaceForUnassignedColumns(std::string tableName, std::vector<Key> assignedColumns)
     {
         
-        size_t extraSize = 0;
+        uint64_t extraSize = 0;
         
         //For all columns marked as NOT NULL
         uint32_t columnCount = m_GetColumnCount(tableName);
@@ -1850,10 +2647,10 @@ private:
         
         std::vector<std::string> tmpVec = m_VectorFromArray<std::string>(names, columnCount);
         
-        for(size_t i = 0; i < assignedColumns.size(); i++)
+        for(uint32_t i = 0; i < assignedColumns.size(); i++)
         {
             std::string name = assignedColumns.at(i).name;
-            for(size_t u = 0; u < tmpVec.size();u++)
+            for(uint32_t u = 0; u < tmpVec.size();u++)
             {
                 if(tmpVec.at(u) == name)
                 {
@@ -1862,7 +2659,7 @@ private:
             }
             
         }
-        for(size_t i = 0; i < tmpVec.size();i++)
+        for(uint32_t i = 0; i < tmpVec.size();i++)
         {
             if(tmpVec.at(i) != "")
             {
@@ -1882,9 +2679,9 @@ private:
         
     }
     
-    size_t m_ReadUnsingedValue(uint bytesToRead, size_t offset)
+    uint64_t m_ReadUnsingedValue(uint bytesToRead, uint64_t offset)
     {
-        size_t data = 0;
+        uint64_t data = 0;
         for(uint i = 0; i < bytesToRead;i++)
         {
             data = (data | m_currDB->DBBuffer[offset+bytesToRead-1-i]) << (i == bytesToRead-1 ? 0: 8);
@@ -1894,10 +2691,10 @@ private:
     
     uint32_t m_GetRowCount(std::string tableName)
     {
-        size_t offset = m_GetLastColumnEndOffset(tableName);
-        size_t EOT = m_GetEOT(tableName);
+        uint64_t offset = m_GetLastColumnEndOffset(tableName);
+        uint64_t EOT = m_GetEOT(tableName);
         int resultSize = 0;
-        size_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,UnsignedString(g_stoopidDBRowSig,6),resultSize);
+        uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer,offset,EOT,UnsignedString(g_stoopidDBRowSig,6),resultSize);
         delete[] results;
         return static_cast<uint32_t>(resultSize);
     }
@@ -1977,7 +2774,7 @@ private:
     void m_DirectWriteNullFill(uint64_t offset, uint64_t realLength ,uint64_t nullFilledLength, const char* dataToWrite)
     {
         uchar* data = new uchar[realLength];
-        for(size_t i = 0; i < realLength;i++)
+        for(uint64_t i = 0; i < realLength;i++)
         {
             data[i] = static_cast<uchar>(dataToWrite[i]);
         }
@@ -1994,6 +2791,24 @@ private:
         for(uint64_t i = 0; i < length; i++)
         {
             m_currDB->DBBuffer[offset+i] = dataToWrite[i];
+        }
+    }
+    
+    void m_PushData(uint64_t from_offset, uint64_t push_length)
+    {
+        for(uint64_t i = 0; i < m_currDB->DBSize-from_offset-push_length; i++)
+        {
+            //m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[from_offset+push_length-i];
+            m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[m_currDB->DBSize-1-push_length-i];
+        }
+    }
+    void m_PullData(uint64_t offset, uint64_t pull_length)
+    {
+        for(uint64_t i = 0; i < m_currDB->DBSize-offset-pull_length; i++)
+        {       
+            //m_currDB->DBBuffer[m_currDB->DBSize-1-i] = m_currDB->DBBuffer[m_currDB->DBSize-1-pull_length-i];
+            m_currDB->DBBuffer[offset+i] = m_currDB->DBBuffer[offset+pull_length+i];
+            
         }
     }
     
@@ -2195,7 +3010,7 @@ private:
         return utmp; 
     }
     
-    void ResizeDB(size_t newSize, bool echo=false)
+    void ResizeDB(uint64_t newSize, bool echo=false)
     {
         if(echo)
         {
@@ -2232,15 +3047,26 @@ private:
         }
         
     }
-    
-    size_t TableExist(std::string name)
+    void m_ForceRewriteEOT(uint64_t offset, uint64_t newEOT) //assumes that a check for the existance of the table has been done before
+    {
+        std::string tmp_name = m_ReadString(offset,255);
+        for(int i = 0; i < 8; i++)
+        {
+            m_currDB->DBBuffer[offset+tmp_name.length()+i+1] = (uchar)((uchar*)&newEOT)[i];
+        }
+        
+    }
+    /*
+     * @param Returns 0 on fail and the Offset on sucess - should always be tested against a "0" to make sure the system is working with a valid table
+     */
+    uint64_t TableExist(std::string name)
     {
        uint64_t Offset = 0;
        uchar* sig = new uchar[8]{'\0',static_cast<uchar>('\xFF'),static_cast<uchar>('\xFF'),'\0','\0',static_cast<uchar>('\xFF'),static_cast<uchar>('\xFF'),'\0'};
        UnsignedString uname = UnsignedString(name);
        int resultSize = 0;
        
-       size_t* results = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), m_currDB->DBSize,sig,8,resultSize);
+       uint64_t* results = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), m_currDB->DBSize,sig,8,resultSize);
        if(resultSize == 0)
        {
            std::cout << TERMINAL_RED << "DB Corrupted!! - No EntryTableSignature found!!" << TERMINAL_NOCOLOR << std::endl;
@@ -2248,10 +3074,10 @@ private:
            delete[] sig;
            return 0;
        }
-       size_t end = results[0];
+       uint64_t end = results[0];
        
        //result = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), end, UnsignedBuffer(name.c_str(),name.length()).GetBuffer(), name.length(), resultSize);
-       size_t* result = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), end, uname, resultSize); //Sigh - The buffer that holds the name deletes it self in the middle if a while loop... WTF!!!!!!! - Fixed for some reason the overloaded "=" operator was used instead of the copyconstructor
+       uint64_t* result = UnsignedString::Search(m_currDB->DBBuffer, GetEntryPointer(), end, uname, resultSize); //Sigh - The buffer that holds the name deletes it self in the middle if a while loop... WTF!!!!!!! - Fixed for some reason the overloaded "=" operator was used instead of the copyconstructor
        
        if(resultSize == 0)
        {
