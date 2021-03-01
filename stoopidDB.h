@@ -754,6 +754,7 @@ private:
 struct DBRow
 {
   std::string name = ""; //Only used for errors
+  uint64_t offset = 0xFFFFFFFFFFFFFFFF;
   std::vector<Key> keys = std::vector<Key>(); 
   DBRow()
   {
@@ -769,6 +770,10 @@ struct DBRow
   DBRow(std::string _name)
   {
       name = _name;
+  }
+  DBRow(uint64_t _offset)
+  {
+      offset = _offset;
   }
   Key Find(std::string _name)
   {
@@ -1608,7 +1613,7 @@ public:
        }
        for(uint64_t i = 0; i < rowCount; i++)
        {
-               uint64_t offset = m_GetRowOffsetByIndex(tableName,i);
+               uint64_t offset = rows[i].offset;
                if(offset == 0)
                {
                  m_AddError("[Fatal] Could not find row that was supposed to exist");
@@ -2670,6 +2675,7 @@ private:
                     }
                 }
                 rows[i].InsertData(m_GetColumnNameFromID(tableName,m_ReadUnsingedValue(4,results[i]+6+8+rowOffset)),dataString);
+                rows[i].offset = results[i];
                 rowOffset += columnMAX+4;
                 if(results[i]+6+8+4+rowOffset > results[i]+rowLength)
                 {
