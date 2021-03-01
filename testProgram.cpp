@@ -24,7 +24,7 @@ void CliLoop(DBManager &dbMan)
         }
         else
         {
-            SQLResponse response = dbMan.SQlQuery(tmpInput);
+            SQLResponse response = dbMan.SQlQuery(tmpInput,1);
             if(response.code != SQL_OK)
             {
                 std::cout << "SQL ERROR: " << SQLCodeToString(response.code) << std::endl;

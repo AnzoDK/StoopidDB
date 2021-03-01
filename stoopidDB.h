@@ -1953,6 +1953,11 @@ public:
                                 std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Possible Settings for Column: " << tmpColumn.name << TERMINAL_NOCOLOR << std::endl;
                               }
                               settingsStr.erase(remove_if(settingsStr.begin(), settingsStr.end(), isspace), settingsStr.end());
+                              int testPos = settingsStr.find(")");
+                              if(testPos != std::string::npos)
+                              {
+                                  settingsStr.erase(testPos,settingsStr.length()-testPos);
+                              }
                               if(settingsStr == "NOTNULL")
                               {
                                   tmpColumn.settingsByte = tmpColumn.settingsByte | ColumnSettings::NOT_NULL;
@@ -2061,7 +2066,7 @@ public:
                         if(words.at(3) != "WHERE")
                         {
                            response.code = SQL_SYNTAX_ERROR;
-                           m_AddError("[Fatal] {SQL Code Processing} Invalid Syntax near 'WHERE'");
+                           m_AddError("[Fatal] {SQL Code Processing} Invalid Syntax near 'WHERE' (Possible missing table name)");
                            return response;
                         }
                         else
