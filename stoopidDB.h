@@ -847,6 +847,32 @@ struct SQLResponse
     DBRow* returnedRows = 0x0;
     uint64_t returnedRowsSize = 0;
 };
+
+std::string SQLCodeToString(SQLResponseCode code)
+{
+    switch(code)
+    {
+        case SQL_OK:
+            return "SQL_OK";
+        break;
+        case SQL_NOT_IMPLEMENTED:
+            return "SQL_NOT_IMPLEMENTED";
+        break;
+        case SQL_SCRIPT_ERROR:
+            return "SQL_SCRIPT_ERROR";
+        break;
+        case SQL_NO_TABLE:
+            return "SQL_NO_TABLE";
+        break;
+        case SQL_NO_COLUMN:
+            return "SQL_NO_COLUMN";
+        break;
+        case SQL_SYNTAX_ERROR:
+            return "SQL_SYNTAX_ERROR";
+        break;
+    }
+}
+
 #endif
 
 struct DataBase
@@ -1543,10 +1569,15 @@ public:
    {
        DBRow* rows = m_GetAllRows(tableName);
        uint64_t rowCount = m_GetRowCount(tableName);
+       if(rowCount == 0)
+       {
+           return 1;
+       }
        for(uint64_t i = 0; i < rowCount; i++)
        {
+           
            Key tmpK = rows[i].Find(where);
-           if(tmpK != *nokey)
+           if(tmpK != *nokey || where == *allCondition)
            {
                uint64_t offset = m_GetRowOffsetByIndex(tableName,i);
                if(offset == 0)
@@ -1564,7 +1595,7 @@ public:
                
            }
        }
-       return false;
+       return 0;
    }
    #ifndef NO_SQL
    SQLResponse SQlQuery(std::string sqlQ,bool verbose=false)
@@ -1625,8 +1656,8 @@ public:
            prevIndex = indexes.at(i)+1;
        }
        indexes.clear();
-       std::vector<SQLCommand> CommandKeys = std::vector<SQLCommand>();
-       std::vector<SQLEntity> AffectedEntities = std::vector<SQLEntity>();
+       std::vector<SQLCommand> CommandKeys = std::vector<SQLCommand>(); //TODO Not used - Remove
+       std::vector<SQLEntity> AffectedEntities = std::vector<SQLEntity>(); //TODO Not used - Remove
        std::vector<std::string> Names = std::vector<std::string>();
        size_t FROM = 0;
        for(size_t i = 0; i < lines.size();i++)
@@ -2016,6 +2047,55 @@ public:
            else if(words.at(0) == "delete")
            {
                CommandKeys.push_back(SQLCommand::DELETE);
+               if(words.at(1) == "FROM") //TODO Check for lowercase (or anycase for that matter)
+               {
+                   //Assume that we are dealing with deleting records/entries
+                   if(words.size() < 6 && words.size() != 3)
+                   {
+                       response.code = SQL_SYNTAX_ERROR;
+                       m_AddError("[Fatal] {SQL Code Processing} SQL request has wrong amount of arguemnts for valid DELETE FROM call");
+                       return response;
+                   }
+                   if(words.size() > 3)
+                   {
+                        if(words.at(3) != "WHERE")
+                        {
+                           response.code = SQL_SYNTAX_ERROR;
+                           m_AddError("[Fatal] {SQL Code Processing} Invalid Syntax near 'WHERE'");
+                           return response;
+                        }
+                        else
+                        {
+                           
+                        }
+                   }
+                   else
+                   {
+                       words.at(2) = words.at(2).substr(0,words.at(2).length()-1);
+                       uint64_t tableOffset = TableExist(words.at(2));
+                           if(tableOffset == 0)
+                           {
+                               response.code = SQL_NO_TABLE;
+                               m_AddError("[Fatal] {SQL Code Processing} Couldn't find table: " + words.at(2));
+                           }
+                           else
+                           {
+                               if(DeleteRow(words.at(2),*allCondition))
+                               {
+                                   response.code = SQL_OK;
+                               }
+                               else
+                               {
+                                   response.code = SQL_SCRIPT_ERROR;
+                                   m_AddError("[Fatal] {SQL Code Processing} Something went wrong...");
+                               }
+                           }
+                   }
+               }
+               else
+               {
+                   //Assume that we are dealing with deleting a table (or database, but that makes no sense with this program...)
+               }
                
            }
            else if(words.at(0) == "insert")
@@ -2045,6 +2125,7 @@ public:
    static DBRow* notable;
    static Key* nokey;
    static DBRow* norow;
+   static Key* allCondition;
    ~DBManager()
    {
        if(m_currDB != nullptr)
@@ -2469,7 +2550,8 @@ private:
                         }
                         else
                         {
-                            //The number is larger than 64 bits - a solution is needed for this
+                            //TODO The number is larger than 64 bits - a solution is needed for this - ALSO! a solution could be to just read as many 64bit ints as needed and just combine them into a string
+                            
                           break;  
                         }
                     }
@@ -3074,3 +3156,4 @@ private:
 DBRow* DBManager::notable = new DBRow("NOT FOUND");
 Key* DBManager::nokey = new Key("","");
 DBRow* DBManager::norow = new DBRow("NO ROWS");
+Key* DBManager::allCondition = new Key("*","*");

@@ -1,6 +1,5 @@
 #include <iostream>
 #include "stoopidDB.h"
-
 void RowPrinter(DBRow* row, int arraySize)
 {
     for(size_t i = 0; i < arraySize;i++)
@@ -10,8 +9,50 @@ void RowPrinter(DBRow* row, int arraySize)
     }
 }
 
-int main()
+void CliLoop(DBManager &dbMan)
 {
+    bool loop = true;
+    while(loop)
+    {
+        std::string tmpInput = "";
+        std::cout << "> ";
+        getline(std::cin,tmpInput);
+        if(tmpInput == "quit")
+        {
+            loop = false;
+            break;
+        }
+        else
+        {
+            SQLResponse response = dbMan.SQlQuery(tmpInput);
+            if(response.code != SQL_OK)
+            {
+                std::cout << "SQL ERROR: " << SQLCodeToString(response.code) << std::endl;
+                std::cout << dbMan.Error() << std::endl;
+            }
+            else
+            {
+                std::cout << "SQL Response: " << SQLCodeToString(response.code) << std::endl;
+                RowPrinter(dbMan.SqlReturn,dbMan.SqlReturnLength);
+            }
+        }
+    }
+}
+
+int main(int argc, char** argv)
+{
+    if(argc == 2 && std::string(argv[1]) == "--cli")
+    {
+        DBManager* dbMan = new DBManager();
+        dbMan->CreateDB("./local_db.sdb");
+        dbMan->LoadDB("./local_db.sdb");
+        std::cout << "Database created: CLI READY!" << std::endl;
+        CliLoop(*dbMan);
+        delete dbMan;
+        return 0;
+    }
+    else
+    {
     DBManager* dbMan = new DBManager();
     dbMan->CreateDB("./local_db.sdb");
     dbMan->LoadDB("./local_db.sdb");
@@ -76,7 +117,7 @@ int main()
     delete[] result;
     dbMan->DeleteTable("Users");
 #ifndef NO_SQL
-    if(dbMan->SQlQuery("CREATE TABLE Hats(ID int(8) NOT NULL, Size int(8) NOT NULL, PRIMARY KEY (ID)); SELECT ( Title, id ) FROM Posts;",1).code != SQLResponseCode::SQL_OK)
+    if(dbMan->SQlQuery("CREATE TABLE Hats(ID int(8) NOT NULL, Size int(8) NOT NULL, PRIMARY KEY (ID)); SELECT (Title,id) FROM Posts;",1).code != SQLResponseCode::SQL_OK)
     {
         std::cout << TERMINAL_RED << "Error - as expected" << std::endl;
         std::cout << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
@@ -131,4 +172,5 @@ int main()
 #endif
     
     delete dbMan;
+}
 }
