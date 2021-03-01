@@ -1565,7 +1565,7 @@ public:
        
    }
    
-   bool DeleteRow(std::string tableName, Key where) //TODO Add support for multiple conditions //Lol ofc XDXDXDXD
+   bool DeleteRow(std::string tableName, Key where)
    {
        DBRow* rows = m_GetAllRows(tableName);
        uint64_t rowCount = m_GetRowCount(tableName);
@@ -1594,6 +1594,34 @@ public:
                return 1;
                
            }
+       }
+       return 0;
+   }
+   bool DeleteRow(std::string tableName, Key* where, uint64_t whereSize)
+   {
+       uint64_t rowCount = 0;
+       DBRow* rows = GetRowsWhere(tableName,where,whereSize,rowCount);
+       
+       if(rowCount == 0)
+       {
+           return 1;
+       }
+       for(uint64_t i = 0; i < rowCount; i++)
+       {
+               uint64_t offset = m_GetRowOffsetByIndex(tableName,i);
+               if(offset == 0)
+               {
+                 m_AddError("[Fatal] Could not find row that was supposed to exist");
+                 return 0;
+               }
+               uint64_t length = m_GetRowLength(offset);
+               for(uint64_t i = 0; i < m_currDB->DBSize-offset;i++)
+               {
+                   m_currDB->DBBuffer[offset+i] = m_currDB->DBBuffer[offset+length+i];
+               }
+               ResizeDB(m_currDB->DBSize-length,1);
+               return 1;
+               
        }
        return 0;
    }
@@ -2063,7 +2091,7 @@ public:
                    }
                    if(words.size() > 3)
                    {
-                        if(words.at(3) != "WHERE")
+                        if(words.at(3) != "WHERE") //TODO check for NOT operator
                         {
                            response.code = SQL_SYNTAX_ERROR;
                            m_AddError("[Fatal] {SQL Code Processing} Invalid Syntax near 'WHERE' (Possible missing table name)");
@@ -2071,7 +2099,70 @@ public:
                         }
                         else
                         {
-                           
+                           std::vector<Key> andKeys = std::vector<Key>();
+                           int currAndPos = 4;
+                           while(true)
+                           {
+                               if(words.at(currAndPos) == "AND") //TODO check for lowercase //TODO check for OR
+                               {
+                                   int equalHolder = -1;
+                                   int equalTo = -1;
+                                   int equal = -1;
+                                   int equalCounter = 0;
+                                   for(int z = 0; z < 3; z++)
+                                   {
+                                       if(currAndPos+1+z > words.size()-1)
+                                       {
+                                           break; //lets not go out of bounds XD
+                                       }
+                                       int equalSign = words.at(currAndPos+1+z).find("=");
+                                       if(equalSign != std::string::npos)
+                                       {
+                                           equalCounter++;
+                                           equalHolder = z;
+                                           if(equalSign == words.at(currAndPos+1+z).length()-1 && words.at(currAndPos+1+z).length() > 1)
+                                           {
+                                               equalTo = z+1;
+                                               equal=z;
+                                           }
+                                           else if(words.at(currAndPos+1+z).length() == 1)
+                                           {
+                                               equal = z-1;
+                                               equalTo = z+1;
+                                           }
+                                           else if(equalSign == 0)
+                                           {
+                                               equalTo = z;
+                                               equal = z-1;                                               
+                                           }
+                                           else
+                                           {
+                                               equal = z;
+                                               equalTo = z;
+                                           }
+                                           break;
+                                       }
+                                       
+                                   }
+                                   if(equalCounter != 1 || (equalTo == -1 || equal == -1 || equalHolder -1))
+                                   {
+                                       response.code = SQL_SYNTAX_ERROR;
+                                       m_AddError("[Fatal] {SQL Code Processing} Dangeling AND statement - Couldn't process AND statement");
+                                       return response;
+                                   }
+                                   words.at(currAndPos+1+equalHolder).erase(words.at(currAndPos+1+equalHolder).find("="),1);
+                                   andKeys.push_back(Key(words.at(currAndPos+1+equal),words.at(currAndPos+1+equalTo)));
+                                   
+                               }
+                               if(currAndPos > words.size()-1)
+                               {
+                                   break;
+                               }
+                                   
+                           }
+                           uint64_t delConArrSize = 0;
+                           Key* delConArr = m_ArrayFromVector(andKeys,delConArrSize);
+                           DeleteRow(words.at(3),delConArr,delConArrSize);
                         }
                    }
                    else
@@ -2860,6 +2951,23 @@ private:
             m_currDB->DBBuffer[offset+i] = m_currDB->DBBuffer[offset+pull_length+i];
             
         }
+    }
+    
+    int m_ArraySum(int* arr, uint arrSize, bool ignoreNegative=false)
+    {
+        int res = 0;
+        for(uint i = 0; i < arrSize; i++)
+        {
+            if(ignoreNegative && arr[i] < 0)
+            {
+                continue;
+            }
+            else
+            {
+                res+=arr[i];
+            }
+        }
+        return res;
     }
     
     uint64_t m_GetEOT(std::string tableName)
