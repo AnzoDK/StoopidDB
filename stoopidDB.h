@@ -1614,7 +1614,7 @@ public:
        for(uint64_t i = 0; i < rowCount; i++)
        {
                uint64_t offset = rows[i].offset;
-               if(offset == 0)
+               if(offset == 0 || offset == 0xFFFFFFFFFFFFFFFF)
                {
                  m_AddError("[Fatal] Could not find row that was supposed to exist");
                  return 0;
