@@ -1954,9 +1954,9 @@ public:
                                    std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Setting PRIMARY KEY to column: " << tmpPrim << TERMINAL_NOCOLOR << std::endl;  
                                  }
                                  dbColumns.at(z).settingsByte = (dbColumns.at(z).settingsByte | ColumnSettings::PRIMARY_KEY);
+                                 found = 1;
+                                 break;
                              }
-                             found = 1;
-                             break;
                           }
                           if(!found)
                           {
