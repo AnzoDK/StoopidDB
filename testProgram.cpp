@@ -144,7 +144,7 @@ int main(int argc, char** argv)
                         std::cout << "ColumnName: " << rows[0].keys.at(u).name << "; ColumnValue: " << rows[0].keys.at(u).value << " - Expected(" << row.Find("Size").value << ")" << std::endl;
                         if(rows[0].keys.at(u).value == row.Find("Size").value)
                         {
-                            std::cout << TERMINAL_GREEN << "Coulumn Match!" << TERMINAL_CYAN << std::endl;
+                            std::cout << TERMINAL_GREEN << "Coulumn Match!" << TERMINAL_NOCOLOR << std::endl;
                         }
                     }
                     else
