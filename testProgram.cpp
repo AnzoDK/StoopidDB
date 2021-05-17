@@ -128,7 +128,7 @@ int main(int argc, char** argv)
         RowPrinter(dbMan->SqlReturn,dbMan->SqlReturnLength);
         DBRow row = DBRow();
         row.InsertData("Size","12");
-        std::cout << TERMINAL_GREEN << "No error returned by SQL handler - Testing Database against expected outputs..." << TERMINAL_NOCOLOR<< std::endl;
+        std::cout << TERMINAL_GREEN << "No error returned by SQL handler - Testing Database against expected outputs..."  << TERMINAL_NOCOLOR << std::endl;
         std::cout << TERMINAL_CYAN << "Inserting test row containg: Column: (Size) = " << row.Find("Size").value << std::endl;
         if(dbMan->InsertRow("Hats",row))
         {

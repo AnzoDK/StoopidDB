@@ -63,12 +63,23 @@ struct Key
 };
 #endif
 
+#ifndef STOOPIDDB_NO_COLORS
 
 #define TERMINAL_RED "\033[0;31m"
 #define TERMINAL_NOCOLOR "\033[0m"
 #define TERMINAL_CYAN "\033[0;36m"
 #define TERMINAL_YELLOW "\033[0;33m"
 #define TERMINAL_GREEN "\033[0;32m"
+
+#else
+
+#define TERMINAL_RED ""
+#define TERMINAL_NOCOLOR ""
+#define TERMINAL_CYAN ""
+#define TERMINAL_YELLOW ""
+#define TERMINAL_GREEN ""
+
+#endif
 
 typedef unsigned char uchar;
 uchar g_stoopidDBTableSig[8]{
