@@ -6,7 +6,7 @@
  If modifications to this file is made and/or new functions are created, it would be wise to keep this concept in mind to not confuse older users.
  
  */
-#if defined (WIN32) || defined(WIN64)
+#if defined (WIN32) || defined(WIN64) || defined(_WIN32)
 typedef unsigned int uint;
 typedef unsigned char u_int8_t; 
 #endif
