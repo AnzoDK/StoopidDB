@@ -1,0 +1,11 @@
+build/*
+pkg/*
+src/*
+StoopidDB/*
+*.pkg.tar.zst
+Relics/*
+*.sdb
+*.kdev4
+*.out
+backUp_dataBase
+*.exe
