@@ -175,17 +175,25 @@ int main(int argc, char** argv)
             return 1;
         }
     }
-    if(dbMan->SQlQuery("CREATE IF NOT EXISTS Hats (id int);").code != SQLResponseCode::SQL_OK)
+    if(dbMan->SQlQuery("CREATE TABLE IF NOT EXISTS Hats (id int(8));").code != SQLResponseCode::SQL_OK)
     {
-        std::cout << TERMINAL_RED << "[FATAL] SQL CREATE IF NOT EXISTS insertion failed with error: " << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
+        std::cout << TERMINAL_RED << "[FATAL] SQL CREATE IF NOT EXISTS failed with error: " << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
         delete dbMan;
         return 1;
     }
-    if(dbMan->SQlQuery("CREATE IF EXISTS Hats2 (id int);").code != SQLResponseCode::SQL_OK)
+    else
     {
-        std::cout << TERMINAL_RED << "[FATAL] SQL CREATE IF EXISTS insertion failed with error: " << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
+        std::cout << TERMINAL_GREEN << "\"IF NOT EXISTS\" Works!" << TERMINAL_NOCOLOR << std::endl;
+    }
+    if(dbMan->SQlQuery("CREATE TABLE IF EXISTS Hats2 (id int(8));").code != SQLResponseCode::SQL_OK)
+    {
+        std::cout << TERMINAL_RED << "[FATAL] SQL CREATE IF EXISTS failed with error: " << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
         delete dbMan;
         return 1;
+    }
+    else
+    {
+        std::cout << TERMINAL_GREEN << "\"IF EXISTS\" Works!" << TERMINAL_NOCOLOR << std::endl;
     }
     
 #endif

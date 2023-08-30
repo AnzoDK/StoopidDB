@@ -163,6 +163,13 @@ char** CSplit(const char* str, uint64_t strLen, char seperator, uint64_t &result
     return arr;
 }
 
+std::string StrCloneToLower(std::string str)
+{
+    std::string strClone = str;
+    std::transform(strClone.begin(), strClone.end(), strClone.begin(), ::tolower);
+    return strClone;
+}
+
 void StrToLower(std::string &str)
 {
     std::transform(str.begin(), str.end(), str.begin(), ::tolower);
@@ -1889,35 +1896,37 @@ public:
                    bool checkIfTableExists = 0;
                    bool ifNot = 0;
                    std::string tableNameTmp = "";
-                   if(words.at(++wordIndex) == "if")
+                   if(StrCloneToLower(words.at(wordIndex+1)) == "if")
                    {
-                       if(words.at(++wordIndex) == "not")
+                       wordIndex++;
+                       if(StrCloneToLower(words.at(++wordIndex)) == "not")
                        {
                            //If not
                            ifNot = 1;
-                           if(words.at(++wordIndex) == "exists")
-                           {
-                               //Check if [not] exists
-                               checkIfTableExists = 1;
-                           }
-                           else
-                           {
-                               //ONLY IF EXISTS IS SUPPORTED
-                               m_AddError("Only \"IF EXISTS\" and \"IF NOT EXISTS\" is supported at this moment...");
-                               response.code = SQLResponseCode::SQL_SCRIPT_ERROR;
-                               response.returnedRows = new DBRow[1]; //Just to make sure the delete statement doesn't crash it.
-                               response.returnedRowsSize = 0;
-                               return response;
-                           }
-                           tableNameTmp = words.at(wordIndex+1);
-                           bool doesTableExist = TableExist(tableNameTmp);
-                           if(!ifNot && doesTableExist)
-                           {
-                               response.code = SQLResponseCode::SQL_OK;
-                               response.returnedRows = new DBRow[1]; //Just to make sure the delete statement doesn't crash it.
-                               response.returnedRowsSize = 0;
-                               return response;
-                           }
+                           wordIndex++;
+                       }
+                       if(StrCloneToLower(words.at(wordIndex)) == "exists")
+                       {
+                           //Check if [not] exists
+                           checkIfTableExists = 1;
+                       }
+                       else
+                       {
+                           //ONLY IF EXISTS IS SUPPORTED
+                           m_AddError("Only \"IF EXISTS\" and \"IF NOT EXISTS\" is supported at this moment...");
+                           response.code = SQLResponseCode::SQL_SCRIPT_ERROR;
+                           response.returnedRows = new DBRow[1]; //Just to make sure the delete statement doesn't crash it.
+                           response.returnedRowsSize = 0;
+                           return response;
+                       }
+                       tableNameTmp = words.at(wordIndex+1);
+                       bool doesTableExist = TableExist(tableNameTmp);
+                       if(ifNot && doesTableExist)
+                       {
+                           response.code = SQLResponseCode::SQL_OK;
+                           response.returnedRows = new DBRow[1]; //Just to make sure the delete statement doesn't crash it.
+                           response.returnedRowsSize = 0;
+                           return response;
                        }
                        
                    }
@@ -1933,21 +1942,21 @@ public:
                        }
                        else
                        {
-                           size_t pos = words.at(2).find("(");
-                           words.insert(words.begin()+3,"(");
-                           words.insert(words.begin()+4,words.at(2).substr(pos+1,(words.at(2).length()-1)-pos));
-                           words.at(2) = words.at(2).substr(0,words.at(2).find("("));
+                           size_t pos = words.at(wordIndex).find("(");
+                           words.insert(words.begin()+wordIndex+1,"(");
+                           words.insert(words.begin()+wordIndex+2,words.at(wordIndex).substr(pos+1,(words.at(wordIndex).length()-1)-pos));
+                           words.at(wordIndex) = words.at(wordIndex).substr(0,words.at(wordIndex).find("("));
                        }
                        
                    }
-                   tableName = words.at(2);
+                   tableName = words.at(wordIndex);
                    if(verbose)
                    {
                      std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Guessing action to be: create a new table with name: " << tableName << std::endl << "[Info] {SQL Code Processing} Starting Column Detection..." << TERMINAL_NOCOLOR << std::endl;  
                      
                    }
                    std::string columns = "";
-                   for(int u = 3; u < words.size();u++)
+                   for(int u = ++wordIndex; u < words.size();u++)
                    {
                        columns+=(words.at(u)+" ");
                    }
@@ -2017,6 +2026,17 @@ public:
                       tmpColumn.name = tmpName;
                       start = end+1;
                       end = columns.find(",",start);
+                      if(end == std::string::npos)
+                      {
+                          end = columns.find(")")+1;
+                          size_t complete_end = columns.find(")",end);
+                          if(complete_end == std::string::npos)
+                          {
+                              response.code = SQL_SYNTAX_ERROR;
+                              m_AddError("Missing \")\" - The error occurred in the columns: \"" + columns + "\".");
+                              return response;
+                          }
+                      }
                       std::string tmpTypeString = columns.substr(start,end-start);
                       if(tmpTypeString.find(")")+1 != tmpTypeString.length())
                       {
