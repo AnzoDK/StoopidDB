@@ -181,6 +181,12 @@ int main(int argc, char** argv)
         delete dbMan;
         return 1;
     }
+    if(dbMan->SQlQuery("CREATE IF EXISTS Hats2 (id int);").code != SQLResponseCode::SQL_OK)
+    {
+        std::cout << TERMINAL_RED << "[FATAL] SQL CREATE IF EXISTS insertion failed with error: " << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
+        delete dbMan;
+        return 1;
+    }
     
 #endif
     
