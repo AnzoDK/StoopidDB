@@ -1026,7 +1026,7 @@ public:
       return RetString; 
    }
    
-   void CreateDB(const std::string &path)
+   bool CreateDB(const std::string &path)
    {
        std::ofstream out = std::ofstream(path, std::ofstream::binary);
        if(out)
@@ -1035,11 +1035,12 @@ public:
            sigString.assign("StoopidDB\0\1\0\0\xFF\xFF\0\0\xFF\xFF\0\xC\0\0\0\0\0\0\0",28);
            out.write(sigString.c_str(),sigString.length());
            out.close();
+           return 1;
        }
        else
        {
-           std::cout << "File could not be created - Check permissions" << std::endl;
-           return;
+           std::cout << "File: \"" << path << "\" could not be created - Check permissions" << std::endl;
+           return 0;
        }
    }
    bool LoadDB()
