@@ -1020,9 +1020,6 @@ public:
       {
           RetString += "DataBase Error: " + DBError;
       }
-      
-      
-      
       return RetString; 
    }
    
@@ -1043,11 +1040,12 @@ public:
            return 0;
        }
    }
+   /*Loads or Switches DB if a DB is already loaded*/
    bool LoadDB()
    {
         if(m_currDB != nullptr) //memleaks for the db but as the db has not loaded any files into memory - it is very minor
         {
-            if(m_currDB->DBBuffer != nullptr)
+            if(m_currDB->DBBuffer != nullptr) //This check should be performed by the DataBase object, not the DBManager
             {
                 delete (m_currDB);
             }
