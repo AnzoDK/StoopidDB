@@ -1883,15 +1883,52 @@ public:
                CommandKeys.push_back(SQLCommand::CREATE);
                if(words.at(1) == "table")
                {
+                   size_t wordIndex = 1;
                    AffectedEntities.push_back(SQLEntity::TABLE);
+                   //Check for "IF NOT EXISTS" or "IF EXISTS"
+                   bool checkIfTableExists = 0;
+                   bool ifNot = 0;
+                   std::string tableNameTmp = "";
+                   if(words.at(++wordIndex) == "if")
+                   {
+                       if(words.at(++wordIndex) == "not")
+                       {
+                           //If not
+                           ifNot = 1;
+                           if(words.at(++wordIndex) == "exists")
+                           {
+                               //Check if [not] exists
+                               checkIfTableExists = 1;
+                           }
+                           else
+                           {
+                               //ONLY IF EXISTS IS SUPPORTED
+                               m_AddError("Only \"IF EXISTS\" and \"IF NOT EXISTS\" is supported at this moment...");
+                               response.code = SQLResponseCode::SQL_SCRIPT_ERROR;
+                               response.returnedRows = new DBRow[1]; //Just to make sure the delete statement doesn't crash it.
+                               response.returnedRowsSize = 0;
+                               return response;
+                           }
+                           tableNameTmp = words.at(wordIndex+1);
+                           bool doesTableExist = TableExist(tableNameTmp);
+                           if(!ifNot && doesTableExist)
+                           {
+                               response.code = SQLResponseCode::SQL_OK;
+                               response.returnedRows = new DBRow[1]; //Just to make sure the delete statement doesn't crash it.
+                               response.returnedRowsSize = 0;
+                               return response;
+                           }
+                       }
+                       
+                   }
                    std::string tableName = "";
-                   if(words.at(2).find("(") != std::string::npos)
+                   if(words.at(++wordIndex).find("(") != std::string::npos)
                    {
                        //Is the "(" the last character?
-                       if(words.at(2).find("(") == words.at(2).length()-1)
+                       if(words.at(wordIndex).find("(") == words.at(wordIndex).length()-1)
                        {
-                        words.insert(words.begin()+3,"(");
-                        words.at(2) = words.at(2).substr(0,words.at(2).find("("));
+                        words.insert(words.begin()+(wordIndex+1),"(");
+                        words.at(wordIndex) = words.at(wordIndex).substr(0,words.at(wordIndex).find("("));
                         
                        }
                        else

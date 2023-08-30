@@ -1,5 +1,6 @@
 #include <iostream>
 #include "stoopidDB.h"
+#include <filesystem>
 void RowPrinter(DBRow* row, int arraySize)
 {
     for(size_t i = 0; i < arraySize;i++)
@@ -41,11 +42,16 @@ void CliLoop(DBManager &dbMan)
 
 int main(int argc, char** argv)
 {
+    const char* local_db = "./local_db.sdb";
+    if(std::filesystem::exists(local_db))
+    {
+        std::filesystem::remove(local_db);
+    }
     if(argc == 2 && std::string(argv[1]) == "--cli")
     {
         DBManager* dbMan = new DBManager();
-        dbMan->CreateDB("./local_db.sdb");
-        dbMan->LoadDB("./local_db.sdb");
+        dbMan->CreateDB(local_db);
+        dbMan->LoadDB(local_db);
         std::cout << "Database created: CLI READY!" << std::endl;
         CliLoop(*dbMan);
         delete dbMan;
@@ -54,8 +60,8 @@ int main(int argc, char** argv)
     else
     {
     DBManager* dbMan = new DBManager();
-    dbMan->CreateDB("./local_db.sdb");
-    dbMan->LoadDB("./local_db.sdb");
+    dbMan->CreateDB(local_db);
+    dbMan->LoadDB(local_db);
     DBColumn* columns = new DBColumn[3];
     columns[0] = DBColumn("id",DataType::INT, 8, ColumnSettings::NOT_NULL | ColumnSettings::AUTO_INCREMENT | ColumnSettings::PRIMARY_KEY);
     columns[1] = DBColumn("Name", DataType::VARCHAR, 50, ColumnSettings::NOT_NULL);
@@ -169,6 +175,13 @@ int main(int argc, char** argv)
             return 1;
         }
     }
+    if(dbMan->SQlQuery("CREATE IF NOT EXISTS Hats (id int);").code != SQLResponseCode::SQL_OK)
+    {
+        std::cout << TERMINAL_RED << "[FATAL] SQL CREATE IF NOT EXISTS insertion failed with error: " << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
+        delete dbMan;
+        return 1;
+    }
+    
 #endif
     
     delete dbMan;
