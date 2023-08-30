@@ -1893,7 +1893,7 @@ public:
                    size_t wordIndex = 1;
                    AffectedEntities.push_back(SQLEntity::TABLE);
                    //Check for "IF NOT EXISTS" or "IF EXISTS"
-                   bool checkIfTableExists = 0;
+                   //bool checkIfTableExists = 0;
                    bool ifNot = 0;
                    std::string tableNameTmp = "";
                    if(StrCloneToLower(words.at(wordIndex+1)) == "if")
@@ -1908,7 +1908,7 @@ public:
                        if(StrCloneToLower(words.at(wordIndex)) == "exists")
                        {
                            //Check if [not] exists
-                           checkIfTableExists = 1;
+                           //checkIfTableExists = 1;
                        }
                        else
                        {
@@ -1923,6 +1923,10 @@ public:
                        bool doesTableExist = TableExist(tableNameTmp);
                        if(ifNot && doesTableExist)
                        {
+                           if(verbose)
+                           {
+                               std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Table: \"" << tableNameTmp << "\" already exists, action was: \"IF NOT EXISTS\" - Therefore continuing!" << std::endl;
+                           }
                            response.code = SQLResponseCode::SQL_OK;
                            response.returnedRows = new DBRow[1]; //Just to make sure the delete statement doesn't crash it.
                            response.returnedRowsSize = 0;
