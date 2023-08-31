@@ -1924,6 +1924,16 @@ public:
                        }
                        tableNameTmp = words.at(wordIndex+1);
                        bool doesTableExist = TableExist(tableNameTmp);
+                       if (doesTableExist && !ifNot)
+                       {
+                           if (verbose)
+                           {
+                               std::cout << TERMINAL_CYAN << "[Info] {SQL Code Processing} Table: \"" << tableNameTmp << "\" already exists, Can't create table if it already exists... What in the world are you trying to do?" << std::endl;
+                           }
+                           response.code = SQL_SCRIPT_ERROR;
+                           m_AddError("Can't create table: \"" + tableNameTmp + "\" it already exists.");
+                           return response;
+                       }
                        if(ifNot && doesTableExist)
                        {
                            if(verbose)
