@@ -185,9 +185,8 @@ enum ColumnSettings
     AUTO_INCREMENT = 0b01000000,
     PRIMARY_KEY = 0b00100000
 };
-
-enum DataType
-{
+#undef INT; //WINDOWS WHY DO I NEED TO DO THIS??
+enum DataType {
     INT = 0,
     VARCHAR = 1,
     TIME_DATE = 2
