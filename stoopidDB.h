@@ -9,6 +9,7 @@
 #if defined (WIN32) || defined(WIN64) || defined(_WIN32)
 typedef unsigned int uint;
 typedef unsigned char u_int8_t; 
+#include <string>
 #endif
 #pragma once
 #include <iostream>
@@ -18,9 +19,10 @@ typedef unsigned char u_int8_t;
 #include <string.h>
 #include <streambuf>
 #include <vector>
-#include <unistd.h>
+//#include <unistd.h>
 #include <stdint.h>
 #include <algorithm>
+
 
 #ifndef USE_KEYMAN //Check if we should use keyman.h or use the internal struct - Use the internal struct if in doubt
 struct Key
@@ -927,7 +929,7 @@ struct DataBase
        in.seekg(0, std::ios::end);
        DBSize = in.tellg();
        in.seekg(0, std::ios::beg);
-       char tmpBuff[DBSize];
+       char* tmpBuff = new char[DBSize];
        in.read(tmpBuff,DBSize);
        in.close();
        DBBuffer = new u_int8_t[DBSize];
@@ -937,6 +939,7 @@ struct DataBase
        {
            DBBuffer[i] = static_cast<unsigned char>(tmpBuff[i]);
        }
+       delete[] tmpBuff;
        //Read header
        std::string tmpString = "";
        tmpString.assign("StoopidDB\0\1\0",12);
