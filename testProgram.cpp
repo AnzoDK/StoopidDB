@@ -185,7 +185,7 @@ int main(int argc, char** argv)
     {
         std::cout << TERMINAL_GREEN << "\"IF NOT EXISTS\" Works!" << TERMINAL_NOCOLOR << std::endl;
     }
-    if(dbMan->SQlQuery("CREATE TABLE IF EXISTS Hats2 (id int(8));",true).code == SQLResponseCode::SQL_OK)
+    if(dbMan->SQlQuery("CREATE TABLE IF EXISTS Hats (id int(8));",true).code == SQLResponseCode::SQL_OK)
     {
         std::cout << TERMINAL_RED << "[FATAL] SQL CREATE IF EXISTS failed with error: " << dbMan->Error() << TERMINAL_NOCOLOR << std::endl;
         delete dbMan;
