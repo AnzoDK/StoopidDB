@@ -1339,7 +1339,7 @@ public:
        uint64_t exist = TableExist(tableName);
        if(!exist)
        {
-        return notable;
+        return new DBRow(*notable);
        }
        else
        {
@@ -1357,7 +1357,7 @@ public:
        if(!exist)
        {
            resultSize = 0;
-           return notable;
+           return new DBRow(*notable);
        }
         std::vector<DBRow> rows = std::vector<DBRow>();
         DBRow* dbRows = m_GetAllRows(tableName);
@@ -2311,10 +2311,10 @@ public:
    uint64_t SqlReturnLength = 0;
    #endif
    
-   static DBRow* notable;
-   static Key* nokey;
-   static DBRow* norow;
-   static Key* allCondition;
+    const DBRow* notable = new DBRow("NOT FOUND");
+    const Key* nokey = new Key("","");
+    const DBRow* norow = new DBRow("NO ROWS");
+    const Key* allCondition = new Key("*","*");
    ~DBManager()
    {
        if(m_currDB != nullptr)
@@ -2660,7 +2660,7 @@ private:
             }
         }
         delete[] dbRows;
-        return norow;
+        return new DBRow(*norow);
         
     }
     
@@ -3360,10 +3360,10 @@ private:
 
 };
 
-#if not defined __StoopidDBGlobals
+/*#if not defined __StoopidDBGlobals
 DBRow* DBManager::notable = new DBRow("NOT FOUND");
 Key* DBManager::nokey = new Key("","");
 DBRow* DBManager::norow = new DBRow("NO ROWS");
 Key* DBManager::allCondition = new Key("*","*");
 #define __StoopidDBGlobals 1
-#endif
+#endif*/
