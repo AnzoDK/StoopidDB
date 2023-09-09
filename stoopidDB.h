@@ -3360,7 +3360,7 @@ private:
 
 };
 
-#if not defined (__StoopidDBGlobals)
+#if not defined __StoopidDBGlobals
 DBRow* DBManager::notable = new DBRow("NOT FOUND");
 Key* DBManager::nokey = new Key("","");
 DBRow* DBManager::norow = new DBRow("NO ROWS");
