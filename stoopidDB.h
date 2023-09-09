@@ -89,7 +89,7 @@ struct Key
 #endif
 
 typedef unsigned char uchar;
-const static uchar g_stoopidDBTableSig[8]{
+static uchar g_stoopidDBTableSig[8]{
            '\0',
            static_cast<uchar>('\xFF'),
            static_cast<uchar>('\xFF'),
@@ -100,7 +100,7 @@ const static uchar g_stoopidDBTableSig[8]{
            '\0'
            };
         
-const static uchar g_stoopidDBEntrySig[6] = {
+static uchar g_stoopidDBEntrySig[6] = {
            'E',
            static_cast<uchar>('\xFF'),
            'N',
@@ -108,7 +108,7 @@ const static uchar g_stoopidDBEntrySig[6] = {
            'T',
            static_cast<uchar>('\xFF')
            };
-uchar g_stoopidDBRowSig[6] = {
+static uchar g_stoopidDBRowSig[6] = {
            'R',
            static_cast<uchar>('\0'),
            'O',
