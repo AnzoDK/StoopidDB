@@ -117,7 +117,7 @@ uchar g_stoopidDBRowSig[6] = {
            static_cast<uchar>('\0')
            };
 
-std::vector<std::string> CppSplit(std::string str, char seperator) //I hate vectors for the simple reason that I like C-arrays - But I guess it makes sense here
+inline static std::vector<std::string> CppSplit(std::string str, char seperator) //I hate vectors for the simple reason that I like C-arrays - But I guess it makes sense here
 //
 {
    if(str.at(0) == seperator)
@@ -141,7 +141,7 @@ std::vector<std::string> CppSplit(std::string str, char seperator) //I hate vect
    return arr;
 }
 
-char** CSplit(const char* str, uint64_t strLen, char seperator, uint64_t &resultSize)
+inline static char** CSplit(const char* str, uint64_t strLen, char seperator, uint64_t &resultSize)
 {
     uint64_t count = 0;
     for(uint64_t i = 0; i < strLen;i++)
@@ -169,14 +169,14 @@ char** CSplit(const char* str, uint64_t strLen, char seperator, uint64_t &result
     return arr;
 }
 
-std::string StrCloneToLower(std::string str)
+inline static std::string StrCloneToLower(std::string str)
 {
     std::string strClone = str;
     std::transform(strClone.begin(), strClone.end(), strClone.begin(), ::tolower);
     return strClone;
 }
 
-void StrToLower(std::string &str)
+inline static void StrToLower(std::string &str)
 {
     std::transform(str.begin(), str.end(), str.begin(), ::tolower);
 }
@@ -189,7 +189,7 @@ enum ColumnSettings
     AUTO_INCREMENT = 0b01000000,
     PRIMARY_KEY = 0b00100000
 };
-#undef INT; //WINDOWS WHY DO I NEED TO DO THIS??
+//#undef INT //WINDOWS WHY DO I NEED TO DO THIS?? //I readlly don't think you need to....
 enum DataType {
     INT = 0,
     VARCHAR = 1,
