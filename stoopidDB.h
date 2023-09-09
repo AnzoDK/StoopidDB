@@ -89,7 +89,7 @@ struct Key
 #endif
 
 typedef unsigned char uchar;
-uchar g_stoopidDBTableSig[8]{
+const static uchar g_stoopidDBTableSig[8]{
            '\0',
            static_cast<uchar>('\xFF'),
            static_cast<uchar>('\xFF'),
@@ -100,7 +100,7 @@ uchar g_stoopidDBTableSig[8]{
            '\0'
            };
         
-uchar g_stoopidDBEntrySig[6] = {
+const static uchar g_stoopidDBEntrySig[6] = {
            'E',
            static_cast<uchar>('\xFF'),
            'N',
@@ -877,7 +877,7 @@ struct SQLResponse
     uint64_t returnedRowsSize = 0;
 };
 
-std::string SQLCodeToString(SQLResponseCode code)
+static inline std::string SQLCodeToString(SQLResponseCode code)
 {
     switch(code)
     {
