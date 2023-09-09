@@ -8,8 +8,12 @@
  */
 #pragma once
 #if defined (WIN32) || defined(WIN64) || defined(_WIN32)
+#if not defined (uint)
 typedef unsigned int uint;
+#endif
+#if not defined (u_int8_t)
 typedef unsigned char u_int8_t; 
+#endif
 #include <string>
 #endif
 #include <iostream>
